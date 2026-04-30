@@ -11,7 +11,7 @@ const CORS_HEADERS = {
 };
 
 // 사용자당 하루 최대 AI 호출 횟수 (전체)
-const MAX_DAILY_USER_CALLS = 10;
+const MAX_DAILY_USER_CALLS = 20;
 // 목표당 하루 최대 재시도 횟수
 const MAX_DAILY_GOAL_ATTEMPTS = 5;
 // 요청 본문 최대 크기: 8MB (base64 기준 ~6MB 이미지)
@@ -169,7 +169,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 /** Gemini API 단건 호출 */
 async function callGemini(geminiKey: string, key: VerifyTypeKey, image: string): Promise<Response> {
   return fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -178,7 +178,7 @@ async function callGemini(geminiKey: string, key: VerifyTypeKey, image: string):
           { inlineData: { mimeType: "image/jpeg", data: image } },
           { text: buildPrompt(key) },
         ]}],
-        generationConfig: { maxOutputTokens: 300, temperature: 0, responseMimeType: "application/json" },
+        generationConfig: { maxOutputTokens: 1024, temperature: 0, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
       }),
     },
   );
@@ -309,7 +309,8 @@ serve(async (req) => {
   }
 
   if (!geminiRes.ok) {
-    const errBody = await geminiRes.json().catch(() => null) as { error?: { code?: number; message?: string } } | null;
+    const errBody = await geminiRes.json().catch(() => null) as { error?: { code?: number; message?: string; status?: string } } | null;
+    console.error(`[verify-photo] Gemini error status=${geminiRes.status}`, JSON.stringify(errBody));
     if (geminiRes.status === 429) {
       // 재시도 후에도 429 → 내부 시도 횟수 소모 없이 503 반환
       return jsonResponse(
@@ -329,14 +330,20 @@ serve(async (req) => {
   });
 
   const geminiData = await geminiRes.json() as {
-    candidates?: { content: { parts: { text: string }[] }; finishReason?: string }[];
+    candidates?: { content: { parts: { text?: string; thought?: boolean }[] }; finishReason?: string }[];
   };
 
   if (geminiData.candidates?.[0]?.finishReason === "SAFETY") {
     return jsonResponse({ passed: false, score: 0, failedChecks: [], reason: "사진이 안전 정책에 의해 차단됐습니다." });
   }
 
-  const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+  // thinking 모델은 parts 중 thought:true 부분 제외하고 실제 텍스트만 추출
+  const parts = geminiData.candidates?.[0]?.content?.parts ?? [];
+  console.log("[verify-photo] Gemini full response:", JSON.stringify(geminiData).slice(0, 800));
+  const text = parts.find(p => !p.thought && typeof p.text === "string")?.text?.trim()
+    ?? parts[0]?.text?.trim()
+    ?? "";
+  console.log("[verify-photo] Gemini raw text:", text.slice(0, 300));
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   let result: VerifyResult;
   try {
