@@ -12,6 +12,7 @@ export interface Database {
           streak_count: number;
           recovery_tickets: number;
           xp_total: number;
+          joined_group_ids: string[];
           created_at: string;
           updated_at: string;
         };
@@ -23,6 +24,7 @@ export interface Database {
           streak_count?: number;
           recovery_tickets?: number;
           xp_total?: number;
+          joined_group_ids?: string[];
         };
         Update: Partial<Omit<Database['public']['Tables']['profiles']['Insert'], 'id'>>;
         Relationships: [];

@@ -12,15 +12,16 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 사용자 프로필 (auth.users 확장)
 CREATE TABLE IF NOT EXISTS profiles (
-  id             UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  username       TEXT UNIQUE,
-  avatar_url     TEXT,
-  plan_type      TEXT DEFAULT 'free' CHECK (plan_type IN ('free', 'premium')),
-  streak_count   INT  DEFAULT 0,
-  recovery_tickets INT DEFAULT 2,
-  xp_total       INT  DEFAULT 0,
-  created_at     TIMESTAMPTZ DEFAULT NOW(),
-  updated_at     TIMESTAMPTZ DEFAULT NOW()
+  id               UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  username         TEXT UNIQUE,
+  avatar_url       TEXT,
+  plan_type        TEXT DEFAULT 'free' CHECK (plan_type IN ('free', 'premium')),
+  streak_count     INT  DEFAULT 0,
+  recovery_tickets INT  DEFAULT 2,
+  xp_total         INT  DEFAULT 0,
+  joined_group_ids TEXT[] DEFAULT '{}',
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 목표

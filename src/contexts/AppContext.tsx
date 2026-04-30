@@ -470,12 +470,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .eq("id", id);
   }
 
+  // 로그인 시 DB에서 참여 그룹 불러오기
+  useEffect(() => {
+    if (!user) {
+      setGroups(DEFAULT_GROUPS);
+      return;
+    }
+    async function loadJoinedGroups() {
+      const { data } = await supabase
+        .from("profiles")
+        .select("joined_group_ids")
+        .eq("id", user!.id)
+        .single();
+      const joined: string[] = data?.joined_group_ids ?? [];
+      setGroups(DEFAULT_GROUPS.map(g => ({ ...g, joined: joined.includes(g.id) })));
+    }
+    void loadJoinedGroups();
+  }, [user?.id]);
+
   function joinGroup(id: string) {
-    setGroups(prev => prev.map(g => g.id === id ? { ...g, joined: true } : g));
+    setGroups(prev => {
+      const next = prev.map(g => g.id === id ? { ...g, joined: true } : g);
+      if (user) {
+        const joinedIds = next.filter(g => g.joined).map(g => g.id);
+        void supabase.from("profiles").update({ joined_group_ids: joinedIds }).eq("id", user.id);
+      }
+      return next;
+    });
   }
 
   function leaveGroup(id: string) {
-    setGroups(prev => prev.map(g => g.id === id ? { ...g, joined: false } : g));
+    setGroups(prev => {
+      const next = prev.map(g => g.id === id ? { ...g, joined: false } : g);
+      if (user) {
+        const joinedIds = next.filter(g => g.joined).map(g => g.id);
+        void supabase.from("profiles").update({ joined_group_ids: joinedIds }).eq("id", user.id);
+      }
+      return next;
+    });
   }
 
   return (
