@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, Search, UserPlus, Check, Link2, Copy, Users, MessageCircle, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
+import { copyText, shareOrCopy } from "../lib/share";
+import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
 
 interface Friend {
   id: number;
@@ -21,8 +24,7 @@ const SUGGESTED: Friend[] = [
   { id: 6, name: "유서진",  handle: "@seojin_y",  seed: "Ava",    mutual: 0, invited: false },
 ];
 
-const INVITE_CODE = "CHALLY-OMOM-2026";
-const INVITE_URL  = "https://chally.app/join/CHALLY-OMOM-2026";
+const APP_URL = "https://chally.app";
 
 function Avatar({ seed, size = 40 }: { seed: string; size?: number }) {
   // Color palette based on seed
@@ -46,27 +48,116 @@ function Avatar({ seed, size = 40 }: { seed: string; size?: number }) {
 
 export function FriendInvite() {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [search, setSearch] = useState("");
   const [friends, setFriends] = useState(SUGGESTED);
   const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [loadingInvites, setLoadingInvites] = useState(true);
+  const [error, setError] = useState("");
   const [mounted, setMounted] = useState(false);
+  const inviteCode = profile?.invite_code ?? (user?.id ? `CHALLY-${user.id.slice(0, 8).toUpperCase()}` : "CHALLY-GUEST");
+  const inviteUrl = `${APP_URL}/signup?ref=${encodeURIComponent(inviteCode)}`;
+  const inviteText = `${profile?.username ?? "친구"}님이 챌리로 초대했어요. 같이 챌린지하고 XP 받아요!`;
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadInvites() {
+      if (!user) {
+        setLoadingInvites(false);
+        return;
+      }
+      setLoadingInvites(true);
+      const { data, error: loadError } = await supabase
+        .from("friend_invites")
+        .select("target_key")
+        .eq("invited_by", user.id);
+      if (cancelled) return;
+      if (loadError) {
+        setError(loadError.message);
+      } else {
+        const invitedKeys = new Set((data ?? []).map(row => row.target_key));
+        setFriends(SUGGESTED.map(friend => ({ ...friend, invited: invitedKeys.has(String(friend.id)) })));
+      }
+      setLoadingInvites(false);
+    }
+    void loadInvites();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
   const filtered = friends.filter(f =>
     f.name.includes(search) || f.handle.includes(search)
   );
 
-  function invite(id: number) {
-    setFriends(prev => prev.map(f => f.id === id ? { ...f, invited: true } : f));
+  async function recordInviteEvent(
+    eventType: "copy_code" | "share_link" | "sms_share" | "suggested_friend_invite",
+    targetKey?: string,
+  ) {
+    if (!user) return;
+    await supabase.from("invite_events").insert({
+      user_id: user.id,
+      event_type: eventType,
+      invite_code: inviteCode,
+      target_key: targetKey ?? null,
+    });
   }
 
-  function copyCode() {
+  async function invite(id: number) {
+    const friend = friends.find(f => f.id === id);
+    if (!friend) return;
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    if (friend.invited) {
+      await shareInvite();
+      return;
+    }
+    setFriends(prev => prev.map(f => f.id === id ? { ...f, invited: true } : f));
+    const { error: saveError } = await supabase
+      .from("friend_invites")
+      .insert({
+        invited_by: user.id,
+        target_key: String(friend.id),
+        target_name: friend.name,
+        target_handle: friend.handle,
+        invite_code: inviteCode,
+      });
+    if (saveError) {
+      setError(saveError.message);
+      setFriends(prev => prev.map(f => f.id === id ? { ...f, invited: false } : f));
+      return;
+    }
+    await recordInviteEvent("suggested_friend_invite", String(friend.id));
+    await shareInvite();
+  }
+
+  async function copyCode() {
+    await copyText(inviteCode);
+    await recordInviteEvent("copy_code");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function shareInvite() {
+    await shareOrCopy({
+      title: "챌리 친구 초대",
+      text: inviteText,
+      url: inviteUrl,
+    });
+    await recordInviteEvent("share_link");
+    setShared(true);
+    setTimeout(() => setShared(false), 2000);
+  }
+
+  function inviteBySms() {
+    void recordInviteEvent("sms_share");
+    window.location.href = `sms:?&body=${encodeURIComponent(`${inviteText}\n${inviteUrl}`)}`;
   }
 
   const invitedCount = friends.filter(f => f.invited).length;
@@ -105,6 +196,12 @@ export function FriendInvite() {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-8">
+        {loadingInvites && (
+          <p className="pt-3 text-center text-[12px] font-semibold text-slate-400">초대 기록을 불러오는 중...</p>
+        )}
+        {error && (
+          <p className="mx-4 mt-3 rounded-2xl bg-red-50 px-4 py-3 text-[12px] font-semibold text-red-500">{error}</p>
+        )}
 
         {/* 초대 링크 카드 */}
         <div
@@ -127,10 +224,10 @@ export function FriendInvite() {
                 <p className="text-[11px] font-bold uppercase tracking-widest text-white/60">나의 초대 코드</p>
               </div>
               <p className="text-[28px] font-black text-white tracking-widest mb-4 leading-none">
-                {INVITE_CODE}
+                {inviteCode}
               </p>
               <p className="text-white/60 text-[12px] leading-relaxed mb-4">
-                친구가 이 코드로 가입하면 둘 다<br />
+            친구가 이 코드로 가입하면 둘 다<br />
                 <span className="text-white font-bold">+50 XP</span>를 받아요!
               </p>
 
@@ -147,10 +244,11 @@ export function FriendInvite() {
                   }
                 </button>
                 <button
+                  onClick={shareInvite}
                   className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-white font-bold text-[14px] text-[#FF3355] transition-all active:scale-95"
                 >
-                  <Link2 className="w-4 h-4" />
-                  링크 공유
+                  {shared ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
+                  {shared ? "공유됨" : "링크 공유"}
                 </button>
               </div>
             </div>
@@ -162,7 +260,7 @@ export function FriendInvite() {
             style={{ background: "rgba(0,0,0,0.15)", borderTop: "1px solid rgba(255,255,255,0.1)" }}
           >
             <Link2 className="w-3.5 h-3.5 text-white/40 shrink-0" />
-            <p className="text-[11px] text-white/40 font-medium truncate">{INVITE_URL}</p>
+            <p className="text-[11px] text-white/40 font-medium truncate">{inviteUrl}</p>
           </div>
         </div>
 
@@ -176,13 +274,14 @@ export function FriendInvite() {
           }}
         >
           {[
-            { emoji: "💬", label: "카카오톡", color: "#FEE500", textColor: "#3A1D1D" },
-            { emoji: "📱", label: "문자",     color: "#34C759", textColor: "white"   },
-            { emoji: "📸", label: "인스타",   color: "#E1306C", textColor: "white"   },
-            { emoji: "📋", label: "기타",     color: "#F1F5F9", textColor: "#64748B" },
-          ].map(({ emoji, label, color, textColor }) => (
+            { emoji: "💬", label: "카카오톡", color: "#FEE500", textColor: "#3A1D1D", action: shareInvite },
+            { emoji: "📱", label: "문자",     color: "#34C759", textColor: "white",   action: inviteBySms },
+            { emoji: "📸", label: "인스타",   color: "#E1306C", textColor: "white",   action: shareInvite },
+            { emoji: "📋", label: "기타",     color: "#F1F5F9", textColor: "#64748B", action: shareInvite },
+          ].map(({ emoji, label, color, textColor, action }) => (
             <button
               key={label}
+              onClick={action}
               className="flex flex-col items-center gap-1.5 py-3 rounded-2xl active:scale-95 transition-all"
               style={{ background: color }}
             >
@@ -285,7 +384,10 @@ export function FriendInvite() {
             <p className="text-[14px] font-bold text-slate-900">연락처로 초대</p>
             <p className="text-[12px] text-slate-400 mt-0.5">전화번호부에서 친구 찾기</p>
           </div>
-          <button className="text-[12px] font-bold text-[#FF3355] bg-[#FFF0F3] px-3 py-1.5 rounded-full active:bg-[#FFE0E7] transition-colors">
+          <button
+            onClick={inviteBySms}
+            className="text-[12px] font-bold text-[#FF3355] bg-[#FFF0F3] px-3 py-1.5 rounded-full active:bg-[#FFE0E7] transition-colors"
+          >
             열기
           </button>
         </div>

@@ -3,15 +3,15 @@ import type { VerifyTypeKey } from "../lib/verifyTypes";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 import type {
-  Goal as DbGoal,
   Verification as DbVerification,
-  SnoozeRecord,
+  Group as DbGroup,
   NotificationRecord,
 } from "../types/database";
 
 /* ── 그룹 타입 ── */
 export interface Group {
   id: string;
+  dbId?: string;
   title: string;
   desc: string;
   members: number;
@@ -38,6 +38,32 @@ const DEFAULT_GROUPS: Group[] = [
   { id: "6", title: "장소 탐험대",    desc: "목표 장소에서 인증샷을 찍어요",      members: 19, rate: 63, status: "진행중",  statusColor: "#10B981", category: "생활", joined: false, verifyType: "location_photo", rule: "목표 장소 방문 인증 사진",                       goal: "장소 방문 인증",      myRank: 9,  myRate: 55, myStreak: 4,  cover: "https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=800&fit=crop" },
 ];
 
+function legacyGroupId(row: DbGroup) {
+  return row.legacy_id ?? row.id;
+}
+
+function mapDbGroup(row: DbGroup, joinedDbIds: Set<string>): Group {
+  return {
+    id: legacyGroupId(row),
+    dbId: row.id,
+    title: row.name,
+    desc: row.description ?? "",
+    members: row.member_count,
+    rate: row.rate,
+    status: row.status,
+    statusColor: row.status_color,
+    category: row.category ?? "기타",
+    joined: joinedDbIds.has(row.id),
+    rule: row.rule ?? "",
+    goal: row.goal ?? "",
+    verifyType: row.verify_type as VerifyTypeKey,
+    myRank: row.my_rank,
+    myRate: row.my_rate,
+    myStreak: row.my_streak,
+    cover: row.cover ?? "",
+  };
+}
+
 /* ── 알림 타입 ── */
 export type NotifType = "goal" | "badge" | "group" | "rank" | "streak";
 
@@ -51,6 +77,8 @@ export interface AppNotification {
   emoji?: string;
   actionable: boolean;
   actionDone: boolean;
+  actionResult?: "accepted" | "rejected";
+  relatedId?: string | null;
 }
 
 function formatRelativeTime(iso: string): string {
@@ -77,32 +105,8 @@ function mapDbNotif(row: NotificationRecord): AppNotification {
     emoji: row.emoji ?? undefined,
     actionable: row.actionable,
     actionDone: row.action_done,
+    relatedId: row.related_id,
   };
-}
-
-/* ── 카테고리 메타 ── */
-export const CATEGORY_META: Record<string, { color: string; colorRgb: string; label: string }> = {
-  exercise: { color: "#FF3355", colorRgb: "255,51,85",  label: "운동" },
-  study:    { color: "#3b82f6", colorRgb: "59,130,246", label: "공부" },
-  reading:  { color: "#FB923C", colorRgb: "251,146,60", label: "독서" },
-  habit:    { color: "#a855f7", colorRgb: "168,85,247", label: "습관" },
-  hobby:    { color: "#22c55e", colorRgb: "34,197,94",  label: "취미" },
-  etc:      { color: "#38BDF8", colorRgb: "56,189,248", label: "기타" },
-};
-
-/* ── Goal 타입 ── */
-export interface Goal {
-  id: string;
-  title: string;
-  color: string;
-  colorRgb: string;
-  category: string;
-  frequency: string;
-  notifyTime: string;
-  streak: number;
-  progress: number;
-  completedToday: boolean;
-  skippedToday: boolean;
 }
 
 function dateKey(value: Date | string) {
@@ -139,32 +143,6 @@ function computeCurrentStreak(verifications: DbVerification[]) {
   return streak;
 }
 
-function mapDbGoalToAppGoal(
-  goal: DbGoal,
-  verifications: DbVerification[],
-  snoozes: SnoozeRecord[],
-): Goal {
-  const meta = CATEGORY_META[goal.category] ?? CATEGORY_META.etc;
-  const todayKey = dateKey(new Date());
-  const completedToday = verifications.some(item => item.status === "completed" && dateKey(item.verified_at) === todayKey);
-  const skippedToday = snoozes.some(item => dateKey(item.snoozed_at) === todayKey);
-  const completedCount = verifications.filter(item => item.status === "completed").length;
-
-  return {
-    id: goal.id,
-    title: goal.title,
-    color: meta.color,
-    colorRgb: meta.colorRgb,
-    category: goal.category,
-    frequency: goal.frequency,
-    notifyTime: goal.reminder_time?.slice(0, 5) ?? "09:00",
-    streak: computeCurrentStreak(verifications),
-    progress: Math.min(completedCount * 10, 100),
-    completedToday,
-    skippedToday: !completedToday && skippedToday,
-  };
-}
-
 interface AppContextType {
   theme: "light" | "dark" | "system";
   setTheme: (t: "light" | "dark" | "system") => void;
@@ -172,22 +150,17 @@ interface AppContextType {
   setNickname: (n: string) => void;
   recoveryTickets: number;
   useRecoveryTicket: () => boolean;
-  // Goals
-  goals: Goal[];
-  completeGoalToday: (id: string) => void;
-  skipGoalToday: (id: string) => void;
-  verifyingGoalId: string | null;
-  setVerifyingGoalId: (id: string | null) => void;
+  // Verification
   verifyType: VerifyTypeKey | null;
   setVerifyType: (t: VerifyTypeKey | null) => void;
   verificationImageUrl: string | null;
   verificationImageFile: File | null;
   verificationHistory: DbVerification[];
-  beginVerification: (params: { goalId?: string | null; verifyType?: VerifyTypeKey | null }) => void;
+  beginVerification: (params: { verifyType?: VerifyTypeKey | null }) => void;
   setVerificationImage: (file: File | null) => void;
   completeCurrentVerification: (serverPhotoUrl?: string | null) => void;
   clearVerification: () => void;
-  refreshGoals: () => Promise<void>;
+  refreshVerifications: () => Promise<void>;
   // Groups
   groups: Group[];
   joinGroup: (id: string) => void;
@@ -199,7 +172,7 @@ interface AppContextType {
   notificationsLoading: boolean;
   markNotifRead: (id: string) => Promise<void>;
   markAllNotifsRead: () => Promise<void>;
-  handleNotifAction: (id: string) => Promise<void>;
+  handleNotifAction: (id: string, accepted?: boolean) => Promise<void>;
   reloadNotifications: () => Promise<void>;
 }
 
@@ -207,7 +180,16 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user, profile, refreshProfile } = useAuth();
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("light");
+  const [theme, setThemeState] = useState<"light" | "dark" | "system">(() => {
+    if (typeof window === "undefined") return "light";
+    const saved = window.localStorage.getItem("chally-theme");
+    return saved === "dark" || saved === "system" || saved === "light" ? saved : "light";
+  });
+
+  const setTheme = (nextTheme: "light" | "dark" | "system") => {
+    setThemeState(nextTheme);
+    window.localStorage.setItem("chally-theme", nextTheme);
+  };
 
   useEffect(() => {
     const apply = (isDark: boolean) =>
@@ -225,8 +207,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [theme]);
   const [nickname, setNickname] = useState("이름");
   const [recoveryTickets, setRecoveryTickets] = useState(2);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [verifyingGoalId, setVerifyingGoalId] = useState<string | null>(null);
   const [verifyType, setVerifyType] = useState<VerifyTypeKey | null>(null);
   const [verificationImageUrl, setVerificationImageUrl] = useState<string | null>(null);
   const [verificationImageFile, setVerificationImageFile] = useState<File | null>(null);
@@ -269,43 +249,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadRemoteGoals() {
+    async function loadVerifications() {
       if (!user) {
-        setGoals([]);
         setVerificationHistory([]);
         return;
       }
 
-      const [{ data: goalsData, error: goalsError }, { data: verificationData, error: verificationsError }, { data: snoozeData, error: snoozeError }] = await Promise.all([
-        supabase.from("goals").select("*").order("created_at", { ascending: true }),
-        supabase.from("verifications").select("*").order("verified_at", { ascending: false }),
-        supabase.from("snooze_records").select("*").order("snoozed_at", { ascending: false }),
-      ]);
+      const { data, error } = await supabase
+        .from("verifications")
+        .select("*")
+        .order("verified_at", { ascending: false });
 
       if (cancelled) return;
 
-      if (goalsError || verificationsError || snoozeError) {
-        console.error("Failed to load remote goals", { goalsError, verificationsError, snoozeError });
-        setGoals([]);
+      if (error) {
+        console.error("Failed to load verifications", error);
         setVerificationHistory([]);
         return;
       }
 
-      setGoals([]);
-
-      setVerificationHistory(verificationData ?? []);
-      const nextGoals = (goalsData ?? []).map(goal => {
-        const goalVerifications = (verificationData ?? []).filter(item => item.goal_id === goal.id);
-        const goalSnoozes = (snoozeData ?? []).filter(item => item.goal_id === goal.id);
-        return mapDbGoalToAppGoal(goal, goalVerifications, goalSnoozes);
-      });
-      setGoals(nextGoals);
+      setVerificationHistory(data ?? []);
     }
 
-    void loadRemoteGoals();
-    return () => {
-      cancelled = true;
-    };
+    void loadVerifications();
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   useEffect(() => {
@@ -332,36 +299,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   }
 
-  function completeGoalToday(id: string) {
-    setGoals(prev => prev.map(g =>
-      g.id === id
-        ? g.completedToday
-          ? g
-          : { ...g, completedToday: true, skippedToday: false, streak: g.streak + 1, progress: Math.min(g.progress + 10, 100) }
-        : g
-    ));
-  }
-
-  function skipGoalToday(id: string) {
-    setGoals(prev => prev.map(g =>
-      g.id === id && !g.completedToday ? { ...g, skippedToday: true } : g
-    ));
-
-    if (user) {
-      void supabase
-        .from("snooze_records")
-        .insert({
-          goal_id: id,
-          user_id: user.id,
-        })
-        .then(({ error }) => {
-          if (error) console.error("Failed to record snooze", error);
-        });
-    }
-  }
-
-  function beginVerification({ goalId = null, verifyType = null }: { goalId?: string | null; verifyType?: VerifyTypeKey | null }) {
-    setVerifyingGoalId(goalId);
+  function beginVerification({ verifyType = null }: { verifyType?: VerifyTypeKey | null }) {
     setVerifyType(verifyType);
     setVerificationImageFile(null);
     replaceVerificationImageUrl(null);
@@ -373,61 +311,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   function clearVerification() {
-    setVerifyingGoalId(null);
     setVerifyType(null);
     setVerificationImageFile(null);
     replaceVerificationImageUrl(null);
   }
 
-  /**
-   * 인증 완료 처리.
-   * DB 저장/XP 지급은 Edge Function(verify-photo)이 이미 처리했으므로
-   * 여기서는 로컬 상태만 낙관적으로 업데이트하고 DB를 재로딩합니다.
-   */
   function completeCurrentVerification(serverPhotoUrl?: string | null) {
-    const goalId = verifyingGoalId;
     const localImageUrl = verificationImageUrl;
 
-    if (goalId) {
-      completeGoalToday(goalId);
-      setVerificationHistory(prev => [
-        {
-          id: `local-${Date.now()}`,
-          goal_id: goalId,
-          user_id: user?.id ?? "guest",
-          verified_at: new Date().toISOString(),
-          photo_url: serverPhotoUrl ?? localImageUrl,
-          status: "completed",
-          xp_earned: 10,
-        },
-        ...prev,
-      ]);
-    }
-
-    clearVerification();
-
-    // DB에서 최신 데이터를 백그라운드로 재로딩 (XP 반영 등)
-    void refreshGoals();
-  }
-
-  async function refreshGoals() {
-    if (!user) return;
-
-    const [{ data: goalsData, error: goalsError }, { data: verificationData, error: verificationsError }, { data: snoozeData, error: snoozeError }] = await Promise.all([
-      supabase.from("goals").select("*").order("created_at", { ascending: true }),
-      supabase.from("verifications").select("*").order("verified_at", { ascending: false }),
-      supabase.from("snooze_records").select("*").order("snoozed_at", { ascending: false }),
+    setVerificationHistory(prev => [
+      {
+        id: `local-${Date.now()}`,
+        user_id: user?.id ?? "guest",
+        verified_at: new Date().toISOString(),
+        photo_url: serverPhotoUrl ?? localImageUrl,
+        status: "completed",
+        xp_earned: 10,
+      },
+      ...prev,
     ]);
 
-    if (goalsError || verificationsError || snoozeError) return;
+    clearVerification();
+    void refreshVerifications();
+  }
 
-    setVerificationHistory(verificationData ?? []);
-    const nextGoals = (goalsData ?? []).map(goal => {
-      const goalVerifications = (verificationData ?? []).filter(item => item.goal_id === goal.id);
-      const goalSnoozes = (snoozeData ?? []).filter(item => item.goal_id === goal.id);
-      return mapDbGoalToAppGoal(goal, goalVerifications, goalSnoozes);
-    });
-    setGoals(nextGoals);
+  async function refreshVerifications() {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("verifications")
+      .select("*")
+      .order("verified_at", { ascending: false });
+
+    if (error) return;
+    setVerificationHistory(data ?? []);
     void refreshProfile();
   }
 
@@ -462,52 +379,112 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .in("id", unreadIds);
   }
 
-  async function handleNotifAction(id: string) {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true, actionDone: true } : n));
+  async function handleNotifAction(id: string, accepted = true) {
+    const target = notifications.find(n => n.id === id);
+    if (accepted && target?.type === "group" && target.relatedId) {
+      joinGroup(target.relatedId);
+    }
+    setNotifications(prev => prev.map(n => n.id === id ? {
+      ...n,
+      read: true,
+      actionDone: true,
+      actionResult: accepted ? "accepted" : "rejected",
+    } : n));
     await supabase
       .from("notifications")
       .update({ read_at: new Date().toISOString(), action_done: true })
       .eq("id", id);
   }
 
-  // 로그인 시 DB에서 참여 그룹 불러오기
   useEffect(() => {
-    if (!user) {
-      setGroups(DEFAULT_GROUPS);
-      return;
+    let cancelled = false;
+
+    async function loadGroups() {
+      const { data: dbGroups, error: groupsError } = await supabase
+        .from("groups")
+        .select("*")
+        .order("legacy_id", { ascending: true, nullsFirst: false });
+
+      if (cancelled) return;
+
+      if (groupsError || !dbGroups?.length) {
+        if (groupsError) console.error("Failed to load groups", groupsError);
+        setGroups(DEFAULT_GROUPS);
+        return;
+      }
+
+      const joinedDbIds = new Set<string>();
+
+      if (user) {
+        const { data: memberships, error: membershipsError } = await supabase
+          .from("group_members")
+          .select("group_id")
+          .eq("user_id", user.id);
+
+        if (cancelled) return;
+
+        if (membershipsError) {
+          console.error("Failed to load group memberships", membershipsError);
+        } else {
+          memberships?.forEach(item => joinedDbIds.add(item.group_id));
+        }
+      }
+
+      setGroups(dbGroups.map(row => mapDbGroup(row, joinedDbIds)));
     }
-    async function loadJoinedGroups() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("joined_group_ids")
-        .eq("id", user!.id)
-        .single();
-      const joined: string[] = data?.joined_group_ids ?? [];
-      setGroups(DEFAULT_GROUPS.map(g => ({ ...g, joined: joined.includes(g.id) })));
-    }
-    void loadJoinedGroups();
+
+    void loadGroups();
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   function joinGroup(id: string) {
+    const target = groups.find(g => g.id === id || g.dbId === id);
+    const appId = target?.id ?? id;
+    const dbId = target?.dbId;
+
     setGroups(prev => {
-      const next = prev.map(g => g.id === id ? { ...g, joined: true } : g);
-      if (user) {
-        const joinedIds = next.filter(g => g.joined).map(g => g.id);
-        void supabase.from("profiles").update({ joined_group_ids: joinedIds }).eq("id", user.id);
-      }
-      return next;
+      if (prev.some(g => (g.id === appId || g.dbId === id) && g.joined)) return prev;
+      return prev.map(g => (g.id === appId || g.dbId === id) ? { ...g, joined: true, members: g.members + 1 } : g);
     });
+
+    if (!user || !dbId) return;
+
+    void supabase
+      .from("group_members")
+      .insert({ group_id: dbId, user_id: user.id })
+      .then(({ error }) => {
+        if (!error) return;
+        if (error.code === "23505") {
+          setGroups(prev => prev.map(g => g.id === appId ? { ...g, joined: true, members: Math.max(0, g.members - 1) } : g));
+          return;
+        }
+        console.error("Failed to join group", error);
+        setGroups(prev => prev.map(g => g.id === appId ? { ...g, joined: false, members: Math.max(0, g.members - 1) } : g));
+      });
   }
 
   function leaveGroup(id: string) {
+    const target = groups.find(g => g.id === id || g.dbId === id);
+    const appId = target?.id ?? id;
+    const dbId = target?.dbId;
+
     setGroups(prev => {
-      const next = prev.map(g => g.id === id ? { ...g, joined: false } : g);
-      if (user) {
-        const joinedIds = next.filter(g => g.joined).map(g => g.id);
-        void supabase.from("profiles").update({ joined_group_ids: joinedIds }).eq("id", user.id);
-      }
-      return next;
+      if (!prev.some(g => (g.id === appId || g.dbId === id) && g.joined)) return prev;
+      return prev.map(g => (g.id === appId || g.dbId === id) ? { ...g, joined: false, members: Math.max(0, g.members - 1) } : g);
     });
+
+    if (!user || !dbId) return;
+
+    void supabase
+      .from("group_members")
+      .delete()
+      .eq("group_id", dbId)
+      .eq("user_id", user.id)
+      .then(({ error }) => {
+        if (!error) return;
+        console.error("Failed to leave group", error);
+        setGroups(prev => prev.map(g => g.id === appId ? { ...g, joined: true, members: g.members + 1 } : g));
+      });
   }
 
   return (
@@ -515,10 +492,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       theme, setTheme,
       nickname, setNickname,
       recoveryTickets, useRecoveryTicket,
-      goals, completeGoalToday, skipGoalToday,
-      verifyingGoalId, setVerifyingGoalId,
       verifyType, setVerifyType,
-      verificationImageUrl, verificationImageFile, verificationHistory, beginVerification, setVerificationImage, completeCurrentVerification, clearVerification, refreshGoals,
+      verificationImageUrl, verificationImageFile, verificationHistory, beginVerification, setVerificationImage, completeCurrentVerification, clearVerification, refreshVerifications,
       groups, joinGroup, leaveGroup, selectedGroupId, setSelectedGroupId,
       notifications, notificationsLoading, markNotifRead, markAllNotifsRead, handleNotifAction, reloadNotifications,
     }}>

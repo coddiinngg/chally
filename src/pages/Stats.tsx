@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { TrendingUp, Flame, Calendar, Trophy, CheckCircle2, ChevronRight, ImageIcon, ChevronLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
@@ -20,11 +20,6 @@ function useCountUp(target: number, duration = 900, delay = 0) {
   }, [target, duration, delay]);
   return val;
 }
-
-const NOW = new Date();
-const CAL_YEAR = NOW.getFullYear();
-const CAL_MONTH = NOW.getMonth();
-const CAL_TODAY = NOW.getDate();
 
 const HEAT_COLORS = [
   "bg-slate-100",
@@ -57,10 +52,23 @@ function Ring({ pct, size = 96 }: { pct: number; size?: number }) {
   );
 }
 
-function CalendarHeatmap({ mounted, calData }: { mounted: boolean; calData: Record<number, number> }) {
-  const today = CAL_TODAY;
-  const firstDow = new Date(CAL_YEAR, CAL_MONTH, 1).getDay();
-  const daysInMonth = new Date(CAL_YEAR, CAL_MONTH + 1, 0).getDate();
+function CalendarHeatmap({
+  mounted,
+  calData,
+  year,
+  month,
+  today,
+  isCurrentMonth,
+}: {
+  mounted: boolean;
+  calData: Record<number, number>;
+  year: number;
+  month: number;
+  today: number;
+  isCurrentMonth: boolean;
+}) {
+  const firstDow = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const dow = ["일", "월", "화", "수", "목", "금", "토"];
 
   const cells: (number | null)[] = [
@@ -79,8 +87,8 @@ function CalendarHeatmap({ mounted, calData }: { mounted: boolean; calData: Reco
         {cells.map((day, i) => {
           if (day === null) return <div key={`e${i}`} />;
           const level = calData[day] ?? 0;
-          const isFuture = day > today;
-          const isToday = day === today;
+          const isFuture = isCurrentMonth && day > today;
+          const isToday = isCurrentMonth && day === today;
           return (
             <div
               key={day}
@@ -115,7 +123,15 @@ function CalendarHeatmap({ mounted, calData }: { mounted: boolean; calData: Reco
 export function Stats() {
   const { verificationHistory, groups } = useApp();
   const [mounted, setMounted] = useState(false);
+  const [calOffset, setCalOffset] = useState(0);
+  const calendarRef = useRef<HTMLDivElement | null>(null);
   const completedVerifications = verificationHistory.filter(item => item.status === "completed");
+  const now = new Date();
+  const calendarDate = new Date(now.getFullYear(), now.getMonth() + calOffset, 1);
+  const calYear = calendarDate.getFullYear();
+  const calMonthIndex = calendarDate.getMonth();
+  const isCurrentMonth = calOffset === 0;
+  const calToday = isCurrentMonth ? now.getDate() : new Date(calYear, calMonthIndex + 1, 0).getDate();
 
   // 월간 히트맵 데이터
   const calData: Record<number, number> = {};
@@ -145,7 +161,7 @@ export function Stats() {
     if (prevDiffDays >= 0 && prevDiffDays < 7) previousWeekCounts[prevDiffDays] += 1;
 
     // 월간 히트맵
-    if (verifiedAt.getFullYear() === CAL_YEAR && verifiedAt.getMonth() === CAL_MONTH && verifiedAt.getDate() <= CAL_TODAY) {
+    if (verifiedAt.getFullYear() === calYear && verifiedAt.getMonth() === calMonthIndex && verifiedAt.getDate() <= calToday) {
       calData[verifiedAt.getDate()] = Math.min((calData[verifiedAt.getDate()] ?? 0) + 1, 3);
     }
   });
@@ -181,19 +197,20 @@ export function Stats() {
 
   const totalDone = completedVerifications.length;
   const doneDays = Object.values(calData).filter(v => v > 0).length;
-  const missedDays = Math.max(0, CAL_TODAY - doneDays);
-  const remainingDays = new Date(CAL_YEAR, CAL_MONTH + 1, 0).getDate() - CAL_TODAY;
+  const daysInMonth = new Date(calYear, calMonthIndex + 1, 0).getDate();
+  const missedDays = Math.max(0, calToday - doneDays);
+  const remainingDays = isCurrentMonth ? daysInMonth - calToday : 0;
   const photoCount = completedVerifications.filter(item => item.photo_url).length;
   const recentPhotoThumbs = completedVerifications.filter(item => item.photo_url).slice(0, 5).map(item => ({ id: item.id, src: item.photo_url as string }));
 
   // 달성률: 이번 달 오늘까지 중 인증 있는 날 비율
-  const successRate = CAL_TODAY > 0 ? Math.round((doneDays / CAL_TODAY) * 100) : 0;
+  const successRate = calToday > 0 ? Math.round((doneDays / calToday) * 100) : 0;
 
   // 참여 중인 챌린지 수
   const joinedCount = groups.filter(g => g.joined).length;
 
   const MONTH_NAMES = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
-  const calMonth = `${CAL_YEAR}년 ${MONTH_NAMES[CAL_MONTH]}`;
+  const calMonth = `${calYear}년 ${MONTH_NAMES[calMonthIndex]}`;
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 80);
@@ -222,7 +239,12 @@ export function Stats() {
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#FF3355] mb-0.5">{calMonth}</p>
           <h1 className="text-2xl font-black text-slate-900">통계</h1>
         </div>
-        <button className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#FFE8EC] active:scale-90 transition-all">
+        <button
+          type="button"
+          onClick={() => calendarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#FFE8EC] active:scale-90 transition-all"
+          aria-label="월간 인증 현황으로 이동"
+        >
           <Calendar className="w-4 h-4 text-[#FF3355]" />
         </button>
       </header>
@@ -328,6 +350,7 @@ export function Stats() {
 
         {/* 월간 히트맵 달력 */}
         <div
+          ref={calendarRef}
           className="bg-white rounded-3xl p-5 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.05)]"
           style={slide(440)}
         >
@@ -337,15 +360,33 @@ export function Stats() {
               <h3 className="text-[16px] font-black text-slate-900">{calMonth}</h3>
             </div>
             <div className="flex gap-1">
-              <button className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-50 active:bg-slate-100 transition-colors">
+              <button
+                type="button"
+                onClick={() => setCalOffset((offset) => offset - 1)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-50 active:bg-slate-100 transition-colors"
+                aria-label="이전 달 보기"
+              >
                 <ChevronLeft className="w-4 h-4 text-slate-400" />
               </button>
-              <button className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-50 active:bg-slate-100 transition-colors">
+              <button
+                type="button"
+                onClick={() => setCalOffset((offset) => Math.min(0, offset + 1))}
+                disabled={calOffset === 0}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-50 active:bg-slate-100 transition-colors disabled:opacity-40 disabled:active:bg-slate-50"
+                aria-label="다음 달 보기"
+              >
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
             </div>
           </div>
-          <CalendarHeatmap mounted={mounted} calData={calData} />
+          <CalendarHeatmap
+            mounted={mounted}
+            calData={calData}
+            year={calYear}
+            month={calMonthIndex}
+            today={calToday}
+            isCurrentMonth={isCurrentMonth}
+          />
           <div className="mt-4 pt-4 border-t border-slate-100 flex gap-4">
             <div className="flex-1 text-center">
               <p className="text-[22px] font-black text-[#FF3355] leading-none">{doneDays}</p>

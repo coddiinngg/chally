@@ -10,10 +10,8 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// 사용자당 하루 최대 AI 호출 횟수 (전체)
+// 사용자당 하루 최대 AI 호출 횟수
 const MAX_DAILY_USER_CALLS = 20;
-// 목표당 하루 최대 재시도 횟수
-const MAX_DAILY_GOAL_ATTEMPTS = 5;
 // 요청 본문 최대 크기: 8MB (base64 기준 ~6MB 이미지)
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
 
@@ -233,14 +231,14 @@ serve(async (req) => {
     return jsonResponse({ error: "이미지 크기가 너무 큽니다. 6MB 이하 이미지를 사용해주세요." }, 413);
   }
 
-  let body: { image: string; verifyType: string; goalId: string | null };
+  let body: { image: string; verifyType: string };
   try {
     body = JSON.parse(rawBody);
   } catch {
     return jsonResponse({ error: "Invalid request body" }, 400);
   }
 
-  const { image, verifyType, goalId } = body;
+  const { image, verifyType } = body;
   if (!image || !verifyType || !VERIFY_TYPES[verifyType as VerifyTypeKey]) {
     return jsonResponse({ error: "Missing required fields" }, 400);
   }
@@ -264,41 +262,6 @@ serve(async (req) => {
     );
   }
 
-  /* ── 목표별 일일 재시도 한도 ── */
-  if (goalId) {
-    const { count: goalTodayAttempts } = await serviceClient
-      .from("verify_attempts")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("goal_id", goalId)
-      .gte("attempted_at", todayStart)
-      .lte("attempted_at", todayEnd);
-
-    if ((goalTodayAttempts ?? 0) >= MAX_DAILY_GOAL_ATTEMPTS) {
-      return jsonResponse(
-        { error: `이 목표는 오늘 최대 ${MAX_DAILY_GOAL_ATTEMPTS}회까지 시도할 수 있습니다. 내일 다시 시도해주세요.` },
-        429,
-      );
-    }
-  }
-
-  /* ── 중복 인증 방지: KST 기준 오늘 이미 완료한 인증이 있으면 차단 ── */
-  if (goalId) {
-    const { data: existing } = await serviceClient
-      .from("verifications")
-      .select("id")
-      .eq("goal_id", goalId)
-      .eq("user_id", user.id)
-      .eq("status", "completed")
-      .gte("verified_at", todayStart)
-      .lte("verified_at", todayEnd)
-      .maybeSingle();
-
-    if (existing) {
-      return jsonResponse({ error: "already_verified", message: "오늘 이미 인증했어요." }, 409);
-    }
-  }
-
   /* ── Gemini API 호출 (429 시 3초 후 1회 재시도) ── */
   let geminiRes = await callGemini(geminiKey, key, image);
 
@@ -319,15 +282,12 @@ serve(async (req) => {
       );
     }
     // 다른 Gemini 오류 → 시도 기록 후 502 반환
-    await serviceClient.from("verify_attempts").insert({ user_id: user.id, goal_id: goalId ?? null });
+    await serviceClient.from("verify_attempts").insert({ user_id: user.id });
     return jsonResponse({ error: `Gemini 오류: ${errBody?.error?.message ?? geminiRes.status}` }, 502);
   }
 
   /* ── 시도 기록 (Gemini 호출 성공 이후에 기록 — 외부 API 장애 시 소모 방지) ── */
-  await serviceClient.from("verify_attempts").insert({
-    user_id: user.id,
-    goal_id: goalId ?? null,
-  });
+  await serviceClient.from("verify_attempts").insert({ user_id: user.id });
 
   const geminiData = await geminiRes.json() as {
     candidates?: { content: { parts: { text?: string; thought?: boolean }[] }; finishReason?: string }[];
@@ -355,18 +315,16 @@ serve(async (req) => {
   }
 
   /* ── 통과 시: Storage 업로드 → DB 저장 → XP 지급 ── */
-  if (result.passed && goalId) {
+  if (result.passed) {
     const imageBytes = Uint8Array.from(atob(image), (c) => c.charCodeAt(0));
-    const filePath = `${user.id}/${goalId}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+    const filePath = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
 
     const photoUrl = await uploadWithRetry(serviceClient, filePath, imageBytes);
     if (!photoUrl) {
-      // 사진 증거 없이 인증을 기록하지 않고 오류를 반환합니다.
       return jsonResponse({ error: "인증 사진 저장에 실패했습니다. 잠시 후 다시 시도해주세요." }, 500);
     }
 
     const { error: insertError } = await serviceClient.from("verifications").insert({
-      goal_id: goalId,
       user_id: user.id,
       status: "completed",
       photo_url: photoUrl,

@@ -77,7 +77,7 @@ function PhotoCard({ grad, label, photoUrl, size }: {
 
 export function Gallery() {
   const navigate = useNavigate();
-  const { verificationHistory, goals } = useApp();
+  const { verificationHistory } = useApp();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [cols, setCols] = useState(3);
   const [filter, setFilter] = useState("전체");
@@ -106,21 +106,17 @@ export function Gallery() {
 
   useEffect(() => { const t = setTimeout(() => setMounted(true), 60); return () => clearTimeout(t); }, []);
 
-  // verificationHistory → Photo[]
   const ALL_PHOTOS: Photo[] = verificationHistory
     .filter(v => v.status === "completed")
     .map((v, i) => {
       const d = new Date(v.verified_at);
-      const goal = goals.find(g => g.id === v.goal_id);
       return {
         id: v.id,
-        label: goal?.title ?? "챌린지 인증",
+        label: "챌린지 인증",
         year: d.getFullYear(),
         month: d.getMonth() + 1,
         day: d.getDate(),
-        grad: goal
-          ? [goal.color, goal.color + "88"] as [string, string]
-          : GRADS[i % GRADS.length],
+        grad: GRADS[i % GRADS.length],
         photoUrl: v.photo_url ?? null,
       };
     });

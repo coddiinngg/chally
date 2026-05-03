@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ArrowLeft, Search, ChevronUp, ChevronDown, MessageCircle, Share2,
   Bell, Plus, X, Flame, CheckCircle, Clock, Send, Heart, ArrowRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { shareOrCopy } from "../lib/share";
+import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
+import type { ChallengeSuggestionCommentRecord, ChallengeSuggestionRecord } from "../types/database";
 
 /* ── 타입 ── */
 type Status   = "투표중" | "개발확정" | "검토중";
@@ -16,8 +20,10 @@ interface Suggestion {
   status: Status; category: Category; duration: Duration;
   votes: number; comments: number; agreeRate: number; daysAgo: string;
   isMine?: boolean; operatorComment?: string; verifyMethod?: string;
-  commentList: { name: string; text: string }[];
+  commentList: { id: string; name: string; text: string }[];
   progress: number;
+  hasCheered?: boolean;
+  notifyOn?: boolean;
 }
 
 const SUGGESTIONS: Suggestion[] = [
@@ -28,8 +34,8 @@ const SUGGESTIONS: Suggestion[] = [
     votes: 128, comments: 14, agreeRate: 67, daysAgo: "3일 전",
     verifyMethod: "스트레칭 완료 사진 또는 영상", progress: 128,
     commentList: [
-      { name: "김", text: "정말 좋은 아이디어에요! 저도 꼭 해보고 싶어요." },
-      { name: "이", text: "스트레칭은 부상 예방에도 좋으니 꼭 만들어 주세요!" },
+      { id: "seed-1", name: "김", text: "정말 좋은 아이디어에요! 저도 꼭 해보고 싶어요." },
+      { id: "seed-2", name: "이", text: "스트레칭은 부상 예방에도 좋으니 꼭 만들어 주세요!" },
     ],
   },
   {
@@ -40,8 +46,8 @@ const SUGGESTIONS: Suggestion[] = [
     verifyMethod: "책 페이지 + 한 줄 감상 사진", progress: 200,
     operatorComment: "많은 분들의 응원 덕분에 개발을 시작하게 됐어요. 최대한 빠르게 만들어 드릴게요!",
     commentList: [
-      { name: "박", text: "와 드디어 확정됐군요. 빨리 출시됐으면 좋겠어요!" },
-      { name: "최", text: "기다리고 있을게요, 기대됩니다!" },
+      { id: "seed-3", name: "박", text: "와 드디어 확정됐군요. 빨리 출시됐으면 좋겠어요!" },
+      { id: "seed-4", name: "최", text: "기다리고 있을게요, 기대됩니다!" },
     ],
   },
   {
@@ -49,7 +55,7 @@ const SUGGESTIONS: Suggestion[] = [
     desc: "하루 권장 수분 섭취를 습관으로 만드는 챌린지예요.",
     status: "검토중", category: "식습관", duration: "21일",
     votes: 57, comments: 6, agreeRate: 72, daysAgo: "5일 전", progress: 57,
-    commentList: [{ name: "정", text: "물 마시는 습관 정말 중요한데 좋아요!" }],
+    commentList: [{ id: "seed-5", name: "정", text: "물 마시는 습관 정말 중요한데 좋아요!" }],
   },
   {
     id: "4", title: "매일 감사 일기 쓰기",
@@ -57,7 +63,7 @@ const SUGGESTIONS: Suggestion[] = [
     status: "투표중", category: "마음챙김", duration: "21일",
     votes: 94, comments: 11, agreeRate: 81, daysAgo: "2일 전",
     isMine: true, progress: 94,
-    commentList: [{ name: "한", text: "저도 요즘 감사 일기 써요. 진짜 좋아요 💛" }],
+    commentList: [{ id: "seed-6", name: "한", text: "저도 요즘 감사 일기 써요. 진짜 좋아요 💛" }],
   },
   {
     id: "5", title: "주 3회 홈트 루틴",
@@ -78,6 +84,44 @@ const STATUS_META: Record<Status, { label: string; emoji: string; color: string;
   "검토중":   { label: "검토 중",    emoji: "👀",  color: "#78716c", bg: "#fafaf9" },
 };
 
+function relativeDay(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.max(0, Math.floor(diff / 86400000));
+  if (days === 0) return "오늘";
+  if (days < 7) return `${days}일 전`;
+  return `${Math.floor(days / 7)}주 전`;
+}
+
+function mapSuggestion(
+  row: ChallengeSuggestionRecord,
+  comments: ChallengeSuggestionCommentRecord[],
+  userId?: string,
+  votedIds = new Set<string>(),
+  subscribedIds = new Set<string>(),
+): Suggestion {
+  return {
+    id: row.id,
+    title: row.title,
+    desc: row.description,
+    status: row.status,
+    category: row.category,
+    duration: row.duration,
+    votes: row.votes_count,
+    comments: row.comments_count,
+    agreeRate: row.agree_rate,
+    daysAgo: relativeDay(row.created_at),
+    isMine: !!userId && row.created_by === userId,
+    operatorComment: row.operator_comment ?? undefined,
+    verifyMethod: row.verify_method ?? undefined,
+    commentList: comments
+      .filter(c => c.suggestion_id === row.id)
+      .map(c => ({ id: c.id, name: c.author_name ?? "나", text: c.body })),
+    progress: row.votes_count,
+    hasCheered: votedIds.has(row.id),
+    notifyOn: subscribedIds.has(row.id),
+  };
+}
+
 /* ── 전역 CSS ── */
 const G = `
   @keyframes g-up    { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)} }
@@ -94,19 +138,19 @@ const G = `
    카드
 ════════════════════════════════════════ */
 function NoteCard({
-  s, idx, onDetail,
-}: { s: Suggestion; idx: number; onDetail: (id: string) => void }) {
-  const [cheered, setCheered] = useState(false);
+  s, idx, onDetail, onCheer,
+}: { s: Suggestion; idx: number; onDetail: (id: string) => void; onCheer: (id: string, next: boolean) => void }) {
   const [heartAnim, setHeartAnim] = useState(false);
   const [open, setOpen] = useState(false);
   const meta = STATUS_META[s.status];
-  const voteCount = s.progress + (cheered ? 1 : 0);
+  const cheered = !!s.hasCheered;
+  const voteCount = s.progress;
   const pct = Math.min((voteCount / 200) * 100, 100);
   const isHot = s.votes >= 100;
 
   function handleCheer(e: React.MouseEvent) {
     e.stopPropagation();
-    setCheered(v => !v);
+    onCheer(s.id, !cheered);
     setHeartAnim(true);
     setTimeout(() => setHeartAnim(false), 500);
   }
@@ -256,7 +300,15 @@ function NoteCard({
 /* ════════════════════════════════════════
    목록 뷰
 ════════════════════════════════════════ */
-function ListView({ onNew, onDetail }: { onNew: () => void; onDetail: (id: string) => void }) {
+function ListView({
+  suggestions, loading, onNew, onDetail, onCheer,
+}: {
+  suggestions: Suggestion[];
+  loading: boolean;
+  onNew: () => void;
+  onDetail: (id: string) => void;
+  onCheer: (id: string, next: boolean) => void;
+}) {
   const [tab, setTab]   = useState<Tab>("전체");
   const [query, setQuery] = useState("");
 
@@ -267,7 +319,7 @@ function ListView({ onNew, onDetail }: { onNew: () => void; onDetail: (id: strin
     { key: "내건의",   label: "내 건의" },
   ];
 
-  const filtered = SUGGESTIONS.filter(s => {
+  const filtered = suggestions.filter(s => {
     if (tab === "모으는중" && s.status !== "투표중")   return false;
     if (tab === "만드는중" && s.status !== "개발확정") return false;
     if (tab === "내건의"   && !s.isMine)              return false;
@@ -323,6 +375,9 @@ function ListView({ onNew, onDetail }: { onNew: () => void; onDetail: (id: strin
 
       {/* 목록 */}
       <div className="flex-1 overflow-y-auto no-sb px-4 pt-4 pb-32">
+        {loading && (
+          <p className="text-center text-[12px] text-slate-400 font-semibold py-4">건의함을 불러오는 중...</p>
+        )}
         {tab === "전체" ? (
           <>
             {voting.length > 0 && (
@@ -332,7 +387,7 @@ function ListView({ onNew, onDetail }: { onNew: () => void; onDetail: (id: strin
                   <span className="text-[11px] text-[#FF3355] font-bold bg-[#FF3355]/8 px-2 py-0.5 rounded-full">{voting.length}</span>
                 </div>
                 <div className="flex flex-col gap-3">
-                  {voting.map((s, i) => <React.Fragment key={s.id}><NoteCard s={s} idx={i} onDetail={onDetail} /></React.Fragment>)}
+                  {voting.map((s, i) => <React.Fragment key={s.id}><NoteCard s={s} idx={i} onDetail={onDetail} onCheer={onCheer} /></React.Fragment>)}
                 </div>
               </div>
             )}
@@ -340,7 +395,7 @@ function ListView({ onNew, onDetail }: { onNew: () => void; onDetail: (id: strin
               <div className="mb-5">
                 <p className="text-[12px] font-bold text-slate-500 uppercase tracking-wide mb-2.5">지금 만들고 있어요</p>
                 <div className="flex flex-col gap-2">
-                  {confirmed.map((s, i) => <React.Fragment key={s.id}><NoteCard s={s} idx={i} onDetail={onDetail} /></React.Fragment>)}
+                  {confirmed.map((s, i) => <React.Fragment key={s.id}><NoteCard s={s} idx={i} onDetail={onDetail} onCheer={onCheer} /></React.Fragment>)}
                 </div>
               </div>
             )}
@@ -348,14 +403,14 @@ function ListView({ onNew, onDetail }: { onNew: () => void; onDetail: (id: strin
               <div className="mb-5">
                 <p className="text-[12px] font-bold text-slate-500 uppercase tracking-wide mb-2.5">운영팀이 보고 있어요</p>
                 <div className="flex flex-col gap-2">
-                  {reviewing.map((s, i) => <React.Fragment key={s.id}><NoteCard s={s} idx={i} onDetail={onDetail} /></React.Fragment>)}
+                  {reviewing.map((s, i) => <React.Fragment key={s.id}><NoteCard s={s} idx={i} onDetail={onDetail} onCheer={onCheer} /></React.Fragment>)}
                 </div>
               </div>
             )}
           </>
         ) : (
           <div className="flex flex-col gap-3">
-            {filtered.map((s, i) => <React.Fragment key={s.id}><NoteCard s={s} idx={i} onDetail={onDetail} /></React.Fragment>)}
+            {filtered.map((s, i) => <React.Fragment key={s.id}><NoteCard s={s} idx={i} onDetail={onDetail} onCheer={onCheer} /></React.Fragment>)}
           </div>
         )}
 
@@ -415,14 +470,23 @@ const WIZARD_STEPS = [
 type Category2 = Category;
 type Duration2 = Duration;
 
-function NewRequestView({ onBack }: { onBack: () => void }) {
+function NewRequestView({ onBack, onCreate }: { onBack: () => void; onCreate: (params: {
+  title: string;
+  description: string;
+  category: Category;
+  duration: Duration;
+  verifyMethod?: string | null;
+}) => Promise<void> }) {
   const [step, setStep]         = useState(0);
   const [dir, setDir]           = useState<"forward" | "back">("forward");
   const [name, setName]         = useState("");
   const [reason, setReason]     = useState("");
   const [duration, setDuration] = useState<Duration2 | null>(null);
   const [category, setCategory] = useState<Category2 | null>(null);
+  const [verifyMethod, setVerifyMethod] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const current = WIZARD_STEPS[step];
   const isLast  = step === WIZARD_STEPS.length - 1;
@@ -432,9 +496,28 @@ function NewRequestView({ onBack }: { onBack: () => void }) {
     step === 1 ? reason.trim().length > 0 :
     category !== null && duration !== null;
 
-  function goNext() {
+  async function goNext() {
     if (!canNext) return;
-    if (isLast) { setSubmitted(true); return; }
+    if (isLast) {
+      if (!category || !duration) return;
+      setSubmitting(true);
+      setError("");
+      try {
+        await onCreate({
+          title: name.trim(),
+          description: reason.trim(),
+          category,
+          duration,
+          verifyMethod: verifyMethod.trim() || null,
+        });
+        setSubmitted(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "건의 저장에 실패했어요.");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
     setDir("forward");
     setStep(s => s + 1);
   }
@@ -610,6 +693,8 @@ function NewRequestView({ onBack }: { onBack: () => void }) {
             <div>
               <p className="text-[13px] font-semibold text-slate-600 mb-1">인증 방법 <span className="text-slate-400 font-normal">(선택)</span></p>
               <input
+                value={verifyMethod}
+                onChange={e => setVerifyMethod(e.target.value)}
                 placeholder="예) 완료 사진 또는 영상"
                 className="w-full text-[15px] text-slate-800 placeholder-slate-300 outline-none pb-3 border-b-2 border-slate-200 focus:border-slate-900 transition-colors bg-transparent"
               />
@@ -620,6 +705,7 @@ function NewRequestView({ onBack }: { onBack: () => void }) {
 
       {/* 네비 버튼 */}
       <div className="px-5 pb-8 pt-3 flex gap-3 bg-white border-t border-slate-100">
+        {error && <p className="absolute left-5 right-5 -top-8 text-center text-[12px] text-red-500 font-semibold">{error}</p>}
         {step > 0 && (
           <button
             onClick={goBack}
@@ -630,12 +716,12 @@ function NewRequestView({ onBack }: { onBack: () => void }) {
         )}
         <button
           onClick={goNext}
-          disabled={!canNext}
+          disabled={!canNext || submitting}
           className={`flex-1 py-3.5 rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 active:scale-[0.97] transition-all ${
             canNext ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-400"
           }`}
         >
-          {isLast ? "건의 제출하기 ✉️" : <>다음 <ArrowRight className="w-4 h-4" /></>}
+          {submitting ? "저장 중..." : isLast ? "건의 제출하기 ✉️" : <>다음 <ArrowRight className="w-4 h-4" /></>}
         </button>
       </div>
     </div>
@@ -645,16 +731,25 @@ function NewRequestView({ onBack }: { onBack: () => void }) {
 /* ════════════════════════════════════════
    상세 뷰
 ════════════════════════════════════════ */
-function DetailView({ suggestion, onBack }: { suggestion: Suggestion; onBack: () => void }) {
-  const [cheered, setCheered]     = useState(false);
+function DetailView({
+  suggestion, onBack, onCheer, onComment, onSubscribe,
+}: {
+  suggestion: Suggestion;
+  onBack: () => void;
+  onCheer: (id: string, next: boolean) => Promise<void> | void;
+  onComment: (id: string, body: string) => Promise<void>;
+  onSubscribe: (id: string, next: boolean) => Promise<void> | void;
+}) {
   const [heartAnim, setHeartAnim] = useState(false);
   const [commentText, setCommentText] = useState("");
-  const [comments, setComments]   = useState(suggestion.commentList);
-  const [notifyOn, setNotifyOn]   = useState(false);
+  const [submittingComment, setSubmittingComment] = useState(false);
   const [barW, setBarW]           = useState(0);
 
   const meta      = STATUS_META[suggestion.status];
-  const voteCount = suggestion.votes + (cheered ? 1 : 0);
+  const cheered = !!suggestion.hasCheered;
+  const notifyOn = !!suggestion.notifyOn;
+  const comments = suggestion.commentList;
+  const voteCount = suggestion.votes;
   const pct       = Math.min((voteCount / 200) * 100, 100);
 
   useEffect(() => {
@@ -663,15 +758,17 @@ function DetailView({ suggestion, onBack }: { suggestion: Suggestion; onBack: ()
   }, []);
 
   function handleCheer() {
-    setCheered(v => !v);
+    void onCheer(suggestion.id, !cheered);
     setHeartAnim(true);
     setTimeout(() => setHeartAnim(false), 500);
   }
 
-  function submitComment() {
+  async function submitComment() {
     if (!commentText.trim()) return;
-    setComments(prev => [...prev, { name: "나", text: commentText.trim() }]);
+    setSubmittingComment(true);
+    await onComment(suggestion.id, commentText.trim());
     setCommentText("");
+    setSubmittingComment(false);
   }
 
   return (
@@ -755,7 +852,7 @@ function DetailView({ suggestion, onBack }: { suggestion: Suggestion; onBack: ()
               </div>
               <p className="text-[13px] text-emerald-700 leading-relaxed mb-3">출시되면 제일 먼저 알려드릴게요 🎉</p>
               <button
-                onClick={() => setNotifyOn(n => !n)}
+                onClick={() => void onSubscribe(suggestion.id, !notifyOn)}
                 className={`w-full py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.97] ${
                   notifyOn ? "bg-emerald-600 text-white" : "bg-white text-emerald-700 border border-emerald-200"
                 }`}
@@ -799,7 +896,7 @@ function DetailView({ suggestion, onBack }: { suggestion: Suggestion; onBack: ()
             <p className="text-[13px] font-bold text-slate-500 mb-3">댓글 {comments.length}</p>
             <div className="flex flex-col gap-3 mb-4">
               {comments.map((c, i) => (
-                <div key={i} className="flex items-start gap-2.5" style={{ animation: `g-fade 0.2s ease ${i * 40}ms both` }}>
+                <div key={c.id} className="flex items-start gap-2.5" style={{ animation: `g-fade 0.2s ease ${i * 40}ms both` }}>
                   <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[13px] font-bold text-slate-500 shrink-0">
                     {c.name}
                   </div>
@@ -827,6 +924,7 @@ function DetailView({ suggestion, onBack }: { suggestion: Suggestion; onBack: ()
           />
           <button
             onClick={submitComment}
+            disabled={submittingComment}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${
               commentText.trim() ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-400"
             }`}
@@ -846,14 +944,156 @@ type View = "list" | "new" | "detail";
 
 export function ChallengeRequest() {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [view, setView]         = useState<View>("list");
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [shareState, setShareState] = useState<"idle" | "shared" | "copied">("idle");
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  const suggestion = detailId ? SUGGESTIONS.find(s => s.id === detailId) : null;
+  const suggestion = detailId ? suggestions.find(s => s.id === detailId) : null;
+
+  useEffect(() => {
+    void loadSuggestions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  async function loadSuggestions() {
+    setLoading(true);
+    setLoadError("");
+    const { data: suggestionRows, error } = await supabase
+      .from("challenge_suggestions")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setLoadError(error.message);
+      setSuggestions(SUGGESTIONS);
+      setLoading(false);
+      return;
+    }
+
+    const ids = (suggestionRows ?? []).map(s => s.id);
+    const [{ data: commentRows }, { data: voteRows }, { data: subscriptionRows }] = await Promise.all([
+      ids.length
+        ? supabase.from("challenge_suggestion_comments").select("*").in("suggestion_id", ids).order("created_at", { ascending: true })
+        : Promise.resolve({ data: [] as ChallengeSuggestionCommentRecord[] }),
+      user && ids.length
+        ? supabase.from("challenge_suggestion_votes").select("suggestion_id").eq("user_id", user.id).in("suggestion_id", ids)
+        : Promise.resolve({ data: [] as { suggestion_id: string }[] }),
+      user && ids.length
+        ? supabase.from("challenge_suggestion_subscriptions").select("suggestion_id").eq("user_id", user.id).in("suggestion_id", ids)
+        : Promise.resolve({ data: [] as { suggestion_id: string }[] }),
+    ]);
+
+    const votedIds = new Set((voteRows ?? []).map(v => v.suggestion_id));
+    const subscribedIds = new Set((subscriptionRows ?? []).map(v => v.suggestion_id));
+    setSuggestions((suggestionRows ?? []).map(row =>
+      mapSuggestion(row, commentRows ?? [], user?.id, votedIds, subscribedIds)
+    ));
+    setLoading(false);
+  }
+
+  function requireUser() {
+    if (!user) {
+      navigate("/login");
+      return false;
+    }
+    return true;
+  }
+
+  async function createSuggestion(params: {
+    title: string;
+    description: string;
+    category: Category;
+    duration: Duration;
+    verifyMethod?: string | null;
+  }) {
+    if (!user) throw new Error("로그인 후 건의할 수 있어요.");
+    const { data, error } = await supabase
+      .from("challenge_suggestions")
+      .insert({
+        title: params.title,
+        description: params.description,
+        category: params.category,
+        duration: params.duration,
+        verify_method: params.verifyMethod,
+        created_by: user.id,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    setSuggestions(prev => [
+      mapSuggestion(data, [], user.id),
+      ...prev,
+    ]);
+  }
+
+  async function toggleCheer(id: string, next: boolean) {
+    if (!requireUser()) return;
+    setSuggestions(prev => prev.map(s => s.id === id ? {
+      ...s,
+      hasCheered: next,
+      votes: Math.max(0, s.votes + (next ? 1 : -1)),
+      progress: Math.max(0, s.progress + (next ? 1 : -1)),
+    } : s));
+
+    const { error } = next
+      ? await supabase.from("challenge_suggestion_votes").insert({ suggestion_id: id, user_id: user!.id })
+      : await supabase.from("challenge_suggestion_votes").delete().eq("suggestion_id", id).eq("user_id", user!.id);
+    if (error) {
+      await loadSuggestions();
+      return;
+    }
+  }
+
+  async function addComment(id: string, body: string) {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    const { data, error } = await supabase
+      .from("challenge_suggestion_comments")
+      .insert({
+        suggestion_id: id,
+        user_id: user.id,
+        author_name: profile?.username ?? "나",
+        body,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    setSuggestions(prev => prev.map(s => s.id === id ? {
+      ...s,
+      comments: s.comments + 1,
+      commentList: [...s.commentList, { id: data.id, name: data.author_name ?? "나", text: data.body }],
+    } : s));
+  }
+
+  async function toggleSubscription(id: string, next: boolean) {
+    if (!requireUser()) return;
+    setSuggestions(prev => prev.map(s => s.id === id ? { ...s, notifyOn: next } : s));
+    const { error } = next
+      ? await supabase.from("challenge_suggestion_subscriptions").insert({ suggestion_id: id, user_id: user!.id })
+      : await supabase.from("challenge_suggestion_subscriptions").delete().eq("suggestion_id", id).eq("user_id", user!.id);
+    if (error) await loadSuggestions();
+  }
 
   function handleBack() {
     if (view === "list") navigate(-1);
     else setView("list");
+  }
+
+  async function shareSuggestion() {
+    if (!suggestion) return;
+    const status = await shareOrCopy({
+      title: suggestion.title,
+      text: `챌리에서 "${suggestion.title}" 챌린지를 응원해 주세요.`,
+      url: `${window.location.origin}/challenge/request?suggestion=${suggestion.id}`,
+    });
+    setShareState(status);
+    setTimeout(() => setShareState("idle"), 1800);
   }
 
   const titles: Record<View, string> = { list: "건의함", new: "건의하기", detail: "건의 내용" };
@@ -870,16 +1110,23 @@ export function ChallengeRequest() {
         <h1 className="text-[17px] font-bold text-slate-900">{titles[view]}</h1>
         <div className="w-9 h-9 flex items-center justify-center">
           {view === "detail" && (
-            <button className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 active:bg-slate-200 transition-colors">
-              <Share2 className="w-4 h-4 text-slate-600" />
+            <button
+              onClick={shareSuggestion}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 active:bg-slate-200 transition-colors"
+              title={shareState === "idle" ? "공유" : "공유 완료"}
+            >
+              {shareState === "idle" ? <Share2 className="w-4 h-4 text-slate-600" /> : <CheckCircle className="w-4 h-4 text-emerald-600" />}
             </button>
           )}
         </div>
       </header>
 
-      {view === "list"   && <ListView onNew={() => setView("new")} onDetail={id => { setDetailId(id); setView("detail"); }} />}
-      {view === "new"    && <NewRequestView onBack={() => setView("list")} />}
-      {view === "detail" && suggestion && <DetailView suggestion={suggestion} onBack={() => setView("list")} />}
+      {loadError && view === "list" && (
+        <p className="bg-red-50 px-4 py-2 text-center text-[12px] font-semibold text-red-500">{loadError}</p>
+      )}
+      {view === "list"   && <ListView suggestions={suggestions} loading={loading} onNew={() => setView("new")} onDetail={id => { setDetailId(id); setView("detail"); }} onCheer={toggleCheer} />}
+      {view === "new"    && <NewRequestView onBack={() => setView("list")} onCreate={createSuggestion} />}
+      {view === "detail" && suggestion && <DetailView suggestion={suggestion} onBack={() => setView("list")} onCheer={toggleCheer} onComment={addComment} onSubscribe={toggleSubscription} />}
     </div>
   );
 }

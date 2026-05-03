@@ -3,6 +3,7 @@ import { Share2, ArrowRight } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../lib/verifyTypes";
+import { shareOrCopy } from "../lib/share";
 
 const CONFETTI_COLORS = ["#FF3355", "#ff6680", "#ffb3c0", "#f97316", "#fbbf24", "#34d399", "#a78bfa"];
 
@@ -36,6 +37,7 @@ export function Success() {
   const { verifyType, verificationImageUrl, groups, completeCurrentVerification } = useApp();
   const serverPhotoUrl = (location.state as { photoUrl?: string | null } | null)?.photoUrl;
   const [mounted, setMounted] = useState(false);
+  const [shareState, setShareState] = useState<"idle" | "shared" | "copied">("idle");
 
   // completeCurrentVerification()이 clearVerification()을 호출해 verifyType이 null이 되므로
   // 마운트 시점의 값을 미리 캡처
@@ -77,6 +79,16 @@ export function Success() {
     transform: mounted ? "scale(1)" : "scale(0.6)",
     transition: `opacity 0.5s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms, transform 0.5s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms`,
   });
+
+  async function shareVerification() {
+    const status = await shareOrCopy({
+      title: "챌리 인증 완료",
+      text: `${vt.emoji} ${capturedGroup?.title ?? vt.label} 챌린지를 완료했어요!`,
+      url: serverPhotoUrl ?? window.location.origin,
+    });
+    setShareState(status);
+    setTimeout(() => setShareState("idle"), 1800);
+  }
 
   return (
     <div className="flex flex-col h-full bg-[#F5F6FA] relative overflow-hidden">
@@ -183,9 +195,12 @@ export function Success() {
           홈으로
           <ArrowRight className="w-5 h-5" />
         </button>
-        <button className="w-full h-10 flex items-center justify-center gap-1.5 text-slate-400 text-[14px] font-medium active:text-slate-600 transition-colors">
+        <button
+          onClick={shareVerification}
+          className="w-full h-10 flex items-center justify-center gap-1.5 text-slate-400 text-[14px] font-medium active:text-slate-600 transition-colors"
+        >
           <Share2 className="w-4 h-4" />
-          인증 사진 공유하기
+          {shareState === "copied" ? "공유 링크 복사됨" : shareState === "shared" ? "공유 완료" : "인증 사진 공유하기"}
         </button>
       </div>
     </div>

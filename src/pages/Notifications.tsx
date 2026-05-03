@@ -89,7 +89,8 @@ export function Notifications() {
                   mounted={mounted}
                   isUnread
                   onRead={() => void markNotifRead(n.id)}
-                  onAction={() => void handleNotifAction(n.id)}
+                  onAccept={() => void handleNotifAction(n.id, true)}
+                  onReject={() => void handleNotifAction(n.id, false)}
                 />
               ))}
             </div>
@@ -109,7 +110,8 @@ export function Notifications() {
                   mounted={mounted}
                   isUnread={false}
                   onRead={() => void markNotifRead(n.id)}
-                  onAction={() => void handleNotifAction(n.id)}
+                  onAccept={() => void handleNotifAction(n.id, true)}
+                  onReject={() => void handleNotifAction(n.id, false)}
                 />
               ))}
             </div>
@@ -138,14 +140,15 @@ export function Notifications() {
 }
 
 function NotifCard({
-  n, index, mounted, isUnread, onRead, onAction, key: _key,
+  n, index, mounted, isUnread, onRead, onAccept, onReject, key: _key,
 }: {
   n: AppNotification;
   index: number;
   mounted: boolean;
   isUnread: boolean;
   onRead: () => void;
-  onAction: () => void;
+  onAccept: () => void;
+  onReject: () => void;
   key?: React.Key;
 }) {
   const Icon = TYPE_ICON[n.type];
@@ -186,7 +189,7 @@ function NotifCard({
         {n.actionable && !n.actionDone && (
           <div className="flex gap-2 mt-3" style={{ paddingLeft: 52 }}>
             <button
-              onClick={onAction}
+              onClick={onAccept}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[#FF3355] text-white text-[13px] font-bold active:scale-95 transition-all"
               style={{ boxShadow: "0 4px 12px rgba(255,51,85,0.3)" }}
             >
@@ -194,7 +197,7 @@ function NotifCard({
               수락
             </button>
             <button
-              onClick={onAction}
+              onClick={onReject}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-slate-100 text-slate-500 text-[13px] font-bold active:scale-95 transition-all"
             >
               <X className="w-3.5 h-3.5" />
@@ -204,7 +207,7 @@ function NotifCard({
         )}
         {n.actionable && n.actionDone && (
           <p className="text-[11px] text-slate-400 mt-2 font-semibold" style={{ paddingLeft: 52 }}>
-            처리 완료
+            {n.actionResult === "rejected" ? "거절 완료" : "수락 완료"}
           </p>
         )}
       </div>

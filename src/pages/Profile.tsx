@@ -43,7 +43,7 @@ function StatBadge({ label, targetVal, suffix, delay }: { label: string; targetV
 
 export function Profile() {
   const navigate = useNavigate();
-  const { nickname, theme, setTheme, goals, recoveryTickets } = useApp();
+  const { nickname, theme, setTheme, recoveryTickets, verificationHistory } = useApp();
   const { signOut, profile } = useAuth();
   const { guardAction } = useGuestGuard();
   const [mounted, setMounted] = useState(false);
@@ -53,15 +53,18 @@ export function Profile() {
   const avatarUrl = profile?.avatar_url ?? null;
   const avatarInitial = (nickname || "?").charAt(0).toUpperCase();
 
-  const totalDone = goals.reduce((s, g) => s + g.streak, 0);
-  const maxStreak = Math.max(...goals.map(g => g.streak), 0);
-  const avgProgress = goals.length > 0
-    ? Math.round(goals.reduce((s, g) => s + g.progress, 0) / goals.length)
-    : 0;
+  const totalDone = verificationHistory.filter((v) => v.status === "completed").length;
+  const currentStreak = profile?.streak_count ?? 0;
+  const uniqueDaysLast30 = new Set(
+    verificationHistory
+      .filter(v => v.status === "completed" && (Date.now() - new Date(v.verified_at).getTime()) < 30 * 86400000)
+      .map(v => v.verified_at.slice(0, 10))
+  ).size;
+  const successRate = Math.round(uniqueDaysLast30 / 30 * 100);
   const stats = [
-    { label: "달성",   targetVal: totalDone,    suffix: "회", delay: 400 },
-    { label: "연속",   targetVal: maxStreak,     suffix: "일", delay: 550 },
-    { label: "성공률", targetVal: avgProgress,   suffix: "%",  delay: 700 },
+    { label: "달성",   targetVal: totalDone,     suffix: "회", delay: 400 },
+    { label: "연속",   targetVal: currentStreak, suffix: "일", delay: 550 },
+    { label: "성공률", targetVal: successRate,    suffix: "%",  delay: 700 },
   ];
 
   useEffect(() => {
@@ -70,7 +73,7 @@ export function Profile() {
   }, []);
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden bg-[#FAFAFA]">
+    <div className="flex flex-col flex-1 overflow-hidden bg-[#FAFAFA] dark:bg-[#090B10]">
       <div className="flex-1 overflow-y-auto">
 
       {/* 히어로 헤더 */}
@@ -220,7 +223,7 @@ export function Profile() {
           }}
         >
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 ml-1 mb-2">설정</p>
-          <div className="rounded-2xl overflow-hidden bg-white border border-black/[0.04]">
+          <div className="rounded-2xl overflow-hidden bg-white dark:bg-[#12161E] border border-black/[0.04] dark:border-white/[0.07]">
             {[
               { icon: Bell,         bg: "bg-[#FFE8EC]", color: "text-[#FF3355]", label: "알림 설정",    onClick: () => guardAction(() => navigate("/settings/notifications")) },
               { icon: Star,         bg: "bg-amber-50",  color: "text-amber-500", label: "리워드 & 배지", onClick: () => guardAction(() => navigate("/rewards")) },
@@ -230,45 +233,45 @@ export function Profile() {
                 {i > 0 && <div className="h-px bg-slate-100 mx-4" />}
                 <button
                   onClick={onClick}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 active:bg-slate-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 active:bg-slate-50 dark:active:bg-white/[0.04] transition-colors"
                 >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
                     <Icon className={`w-4 h-4 ${color}`} />
                   </div>
-                  <span className="flex-1 text-left text-[14px] font-semibold text-slate-800">{label}</span>
-                  <ChevronRight className="w-4 h-4 text-slate-300" />
+                  <span className="flex-1 text-left text-[14px] font-semibold text-slate-800 dark:text-slate-100">{label}</span>
+                  <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600" />
                 </button>
               </div>
             ))}
 
             {/* 테마 설정 */}
-            <div className="h-px bg-slate-100 mx-4" />
+            <div className="h-px bg-slate-100 dark:bg-white/[0.06] mx-4" />
             <div className="px-4 py-3.5">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-slate-100">
-                  {theme === "dark" ? <Moon className="w-4 h-4 text-slate-500" />
-                    : theme === "system" ? <Smartphone className="w-4 h-4 text-slate-500" />
-                    : <Sun className="w-4 h-4 text-slate-500" />}
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-slate-100 dark:bg-white/[0.06]">
+                  {theme === "dark" ? <Moon className="w-4 h-4 text-slate-500 dark:text-slate-300" />
+                    : theme === "system" ? <Smartphone className="w-4 h-4 text-slate-500 dark:text-slate-300" />
+                    : <Sun className="w-4 h-4 text-slate-500 dark:text-slate-300" />}
                 </div>
-                <span className="text-[14px] font-semibold text-slate-800">화면 모드</span>
+                <span className="text-[14px] font-semibold text-slate-800 dark:text-slate-100">화면 모드</span>
               </div>
               <div className="flex gap-2">
                 {([
                   { value: "light",  label: "라이트", icon: Sun },
                   { value: "dark",   label: "다크",   icon: Moon },
-                  { value: "system", label: "사용자 지정", icon: Smartphone },
+                  { value: "system", label: "시스템", icon: Smartphone },
                 ] as const).map(({ value, label, icon: Icon }) => (
                   <button
                     key={value}
                     onClick={() => setTheme(value)}
                     className="flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-xl text-[11px] font-bold transition-all duration-200 active:scale-95"
                     style={theme === value ? {
-                      background: "linear-gradient(115deg,#FF5C7A,#FF3355)",
+                      background: "linear-gradient(115deg,#E84861,#C9223D)",
                       color: "white",
-                      boxShadow: "0 4px 12px rgba(255,51,85,0.3)",
+                      boxShadow: "0 2px 8px rgba(255,51,85,0.18)",
                     } : {
-                      background: "#F1F5F9",
-                      color: "#64748b",
+                      background: "var(--c-control-bg)",
+                      color: "var(--c-control-text)",
                     }}
                   >
                     <Icon className="w-4 h-4" />
@@ -280,18 +283,18 @@ export function Profile() {
           </div>
 
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 ml-1 mb-2 mt-5">계정</p>
-          <div className="rounded-2xl overflow-hidden bg-white border border-black/[0.04]">
+          <div className="rounded-2xl overflow-hidden bg-white dark:bg-[#12161E] border border-black/[0.04] dark:border-white/[0.07]">
             <button
               onClick={async () => {
                 try { await signOut(); } catch {}
                 navigate("/login");
               }}
-              className="w-full flex items-center gap-3 px-4 py-3.5 active:bg-slate-50 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-3.5 active:bg-slate-50 dark:active:bg-white/[0.04] transition-colors"
             >
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-slate-100">
-                <LogOut className="w-4 h-4 text-slate-400" />
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-slate-100 dark:bg-white/[0.06]">
+                <LogOut className="w-4 h-4 text-slate-400 dark:text-slate-500" />
               </div>
-              <span className="flex-1 text-left text-[14px] font-semibold text-slate-500">로그아웃</span>
+              <span className="flex-1 text-left text-[14px] font-semibold text-slate-500 dark:text-slate-400">로그아웃</span>
             </button>
           </div>
         </div>

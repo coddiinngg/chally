@@ -260,20 +260,13 @@ export function Rewards() {
 
   async function loadData() {
     const today = new Date().toISOString().slice(0, 10);
-    const [{ data: verifications }, { data: goalsData }] = await Promise.all([
-      supabase
-        .from("verifications")
-        .select("verified_at, status, xp_earned, goal_id")
-        .eq("user_id", user!.id)
-        .order("verified_at", { ascending: false }),
-      supabase
-        .from("goals")
-        .select("id, title")
-        .eq("user_id", user!.id),
-    ]);
+    const { data: verifications } = await supabase
+      .from("verifications")
+      .select("verified_at, status, xp_earned")
+      .eq("user_id", user!.id)
+      .order("verified_at", { ascending: false });
 
     const all = verifications ?? [];
-    const goalsMap = new Map((goalsData ?? []).map(g => [g.id, g.title]));
     const completed = all.filter(v => v.status === "completed");
 
     const currentStreak = computeCurrentStreak(all);
@@ -288,7 +281,7 @@ export function Rewards() {
 
     setHistory(
       completed.slice(0, 20).map(v => ({
-        label: goalsMap.get(v.goal_id) ?? "목표 달성",
+        label: "챌린지 인증",
         xp: v.xp_earned ?? 0,
         time: formatRelativeTime(v.verified_at),
         color: "#10B981",

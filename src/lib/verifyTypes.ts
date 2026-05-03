@@ -195,14 +195,3 @@ export const VERIFY_TYPES: Record<VerifyTypeKey, VerifyTypeData> = {
 };
 
 export const VERIFY_TYPE_KEYS = Object.keys(VERIFY_TYPES) as VerifyTypeKey[];
-
-export function inferVerifyTypeForGoalCategory(category: string): VerifyTypeKey {
-  switch (category) {
-    case "exercise": return "step_walk";
-    case "study":    return "quote_photo";
-    case "reading":  return "book_cover";
-    case "habit":    return "location_photo";
-    case "hobby":    return "celeb_pose";
-    default:         return "location_photo";
-  }
-}

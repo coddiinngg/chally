@@ -1,6 +1,6 @@
 import { ChevronLeft, Camera, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useApp } from "../contexts/AppContext";
 import { supabase } from "../lib/supabase";
@@ -10,27 +10,73 @@ export function EditProfile() {
   const { user, profile, refreshProfile } = useAuth();
   const { setNickname } = useApp();
   const [username, setUsername] = useState(profile?.username ?? "");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setUsername(profile?.username ?? "");
   }, [profile?.username]);
 
-  const avatarUrl = profile?.avatar_url ?? null;
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(avatarFile);
+    setAvatarPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [avatarFile]);
+
+  const avatarUrl = avatarPreview ?? profile?.avatar_url ?? null;
   const initial = (username || profile?.username || "?").charAt(0).toUpperCase();
+
+  function onPickAvatar(file: File | undefined) {
+    setError("");
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("이미지 파일만 선택할 수 있어요.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError("8MB 이하 이미지를 사용해주세요.");
+      return;
+    }
+    setAvatarFile(file);
+  }
+
+  async function uploadAvatar() {
+    if (!user || !avatarFile) return profile?.avatar_url ?? null;
+    const ext = avatarFile.name.split(".").pop()?.toLowerCase() || "jpg";
+    const filePath = `${user.id}/avatar-${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, avatarFile, {
+        cacheControl: "3600",
+        contentType: avatarFile.type || "image/jpeg",
+        upsert: true,
+      });
+    if (uploadError) throw uploadError;
+    return supabase.storage.from("avatars").getPublicUrl(filePath).data.publicUrl;
+  }
 
   const handleSave = async () => {
     if (!user) return;
+    setError("");
     setSaving(true);
     try {
+      const nextAvatarUrl = await uploadAvatar();
       const { error } = await supabase
         .from("profiles")
-        .update({ username: username.trim() || null })
+        .update({ username: username.trim() || null, avatar_url: nextAvatarUrl })
         .eq("id", user.id);
       if (error) throw error;
       await refreshProfile();
       setNickname(username.trim() || "이름");
+      setAvatarFile(null);
       setSaved(true);
       setTimeout(() => {
         setSaved(false);
@@ -38,6 +84,7 @@ export function EditProfile() {
       }, 800);
     } catch (e) {
       console.error("프로필 저장 실패:", e);
+      setError(e instanceof Error ? e.message : "프로필 저장에 실패했어요.");
     } finally {
       setSaving(false);
     }
@@ -85,13 +132,25 @@ export function EditProfile() {
               )}
             </div>
             <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
               className="absolute bottom-0 right-0 w-9 h-9 flex items-center justify-center rounded-full border-2 border-white shadow-lg text-white"
               style={{ background: "linear-gradient(135deg, #FF3355, #ff5570)" }}
             >
               <Camera className="w-4 h-4" />
             </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => onPickAvatar(e.target.files?.[0])}
+            />
           </div>
-          <p className="text-[12px] text-slate-400 font-medium">탭해서 사진 변경</p>
+          <p className="text-[12px] text-slate-400 font-medium">
+            {avatarFile ? "저장을 누르면 사진이 변경돼요" : "탭해서 사진 변경"}
+          </p>
+          {error && <p className="text-[12px] text-red-500 font-medium mt-2 px-6 text-center">{error}</p>}
         </div>
 
         {/* 입력 필드 */}

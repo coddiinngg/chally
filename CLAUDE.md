@@ -42,10 +42,6 @@ npm run clean     # dist 삭제
 | 경로 | 페이지 |
 |------|--------|
 | `/onboarding` | 온보딩 (1회 처리) |
-| `/goal-setting/category` | 목표 카테고리 선택 |
-| `/goal-setting/frequency` | 목표 빈도 선택 |
-| `/goal-setting/name` | 목표 이름 입력 |
-| `/goals/:id` | 목표 상세 |
 | `/verify/select` | 인증 방법 선택 |
 | `/verify/guide/:type` | 인증 가이드 |
 | `/verify/camera` | 카메라 인증 |
@@ -75,9 +71,8 @@ src/
 ├── components/
 │   ├── Layout.tsx             # 레이아웃 래퍼 (showNav prop)
 │   ├── BottomNav.tsx          # 5탭 바텀 네비게이션
-│   └── SnoozeModal.tsx        # 건너뛰기 바텀시트 (2단계 확인)
 ├── contexts/
-│   ├── AppContext.tsx         # 전역 상태 (goals, groups, notifications 등)
+│   ├── AppContext.tsx         # 전역 상태 (verificationHistory, groups, notifications 등)
 │   ├── AuthContext.tsx        # Supabase 인증 상태 + profile
 │   └── GuestGuardContext.tsx  # 게스트 모드 접근 제어
 ├── lib/
@@ -100,21 +95,10 @@ supabase/
 ### AppContext (`src/contexts/AppContext.tsx`)
 앱 전반의 비인증 상태를 관리합니다.
 
-- **goals**: Supabase `goals` + `verifications` + `snooze_records` 조합으로 계산
+- **verificationHistory**: Supabase `verifications` 테이블 실연동
 - **groups**: 현재 하드코딩 mock 데이터 (6개 그룹), DB 연동 미완
 - **notifications**: Supabase `notifications` 테이블 실연동
-- **goalDraft**: 목표 추가 마법사 임시 상태 (category, frequency)
 - **verification 흐름**: `beginVerification` → `setVerificationImage` → `completeCurrentVerification`
-
-### 카테고리 색상 (`CATEGORY_META`)
-| key | 라벨 | 색상 |
-|-----|------|------|
-| exercise | 운동 | #FF3355 |
-| study | 공부 | #3b82f6 |
-| reading | 독서 | #FB923C |
-| habit | 습관 | #a855f7 |
-| hobby | 취미 | #22c55e |
-| etc | 기타 | #38BDF8 |
 
 ## Supabase
 
@@ -125,12 +109,10 @@ supabase/
 | 테이블 | 설명 |
 |--------|------|
 | `profiles` | 사용자 프로필 (auth.users 확장), streak, XP, recovery_tickets |
-| `goals` | 목표 (카테고리, 빈도, 알림 시간, status) |
 | `verifications` | 인증 기록 (photo_url, xp_earned, status) |
 | `groups` | 챌린지 그룹 |
 | `group_members` | 그룹 멤버 (admin/member role) |
-| `snooze_records` | 목표 건너뛰기 기록 |
-| `notify_records` | 알림 (type: goal/badge/group/rank/streak) |
+| `notifications` | 알림 (type: badge/group/rank/streak) |
 | `verify_attempts` | AI 인증 시도 횟수 추적 (rate limit용) |
 
 ### RLS 정책 요약
@@ -144,7 +126,7 @@ supabase/
 - `profiles_updated_at`: `updated_at` 자동 갱신
 
 ### Storage 버킷
-- `verifications` (공개): 인증 사진 저장 (`{userId}/{goalId}/{timestamp}.jpg`)
+- `verifications` (공개): 인증 사진 저장 (`{userId}/{timestamp}.jpg`)
 - `avatars` (공개): 프로필 사진
 
 ## AI 인증 Edge Function (`verify-photo`)
@@ -156,11 +138,10 @@ supabase secrets set GEMINI_API_KEY=<key>
 ```
 
 ### 인증 흐름
-1. 클라이언트가 base64 이미지 + `verifyType` + `goalId` 전송
-2. Rate limit 확인 (사용자 일 10회, 목표당 5회)
-3. KST 기준 중복 인증 여부 확인
-4. Gemini 2.0 Flash Lite로 AI 판정
-5. 통과 시: Storage 업로드 → `verifications` INSERT → XP +10
+1. 클라이언트가 base64 이미지 + `verifyType` 전송
+2. Rate limit 확인 (사용자 일 20회)
+3. Gemini 2.0 Flash Lite로 AI 판정
+4. 통과 시: Storage 업로드 → `verifications` INSERT → XP +10
 
 ### 인증 타입 (VerifyTypeKey)
 | key | 라벨 |
@@ -176,7 +157,7 @@ supabase secrets set GEMINI_API_KEY=<key>
 
 `sessionStorage.setItem("guestMode", "1")`으로 활성화.
 게스트는 바텀 네비 4개 탭(홈, 챌린지, 통계, 프로필) 접근 가능.
-인증이 필요한 기능(목표 추가, 인증 업로드 등)은 `GuestGuardContext`가 차단 후 `/login`으로 유도.
+인증이 필요한 기능(인증 업로드 등)은 `GuestGuardContext`가 차단 후 `/login`으로 유도.
 
 ## 알려진 미완성 영역
 
@@ -188,5 +169,5 @@ supabase secrets set GEMINI_API_KEY=<key>
 - **피드**: Unsplash 하드코딩, 실제 `verifications.photo_url` 미사용
 - **랭킹**: 달성률/streak 실계산 없음
 - **알림 설정**: 토글 저장 안 됨 (`profiles` 컬럼 없음)
-- **통계 달력**: 월 이동 버튼 기능 없음
-- **프로필 달성 회수**: `Profile.tsx:53` streak 합산 오류
+- **건의함**: mock 데이터, DB 미연동
+- **친구 초대**: mock 데이터, invite_code 미구현

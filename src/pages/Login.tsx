@@ -318,8 +318,8 @@ export function Login() {
     <div className="flex flex-col h-full bg-[#0F1117] relative overflow-hidden">
       {/* 배경 글로우 */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-[#FF3355]/20 blur-[80px]" />
-        <div className="absolute bottom-0 right-0 w-60 h-60 rounded-full bg-[#FF3355]/10 blur-[60px]" />
+        <div className="absolute top-10 -left-36 w-80 h-80 rounded-full bg-[#FF3355]/20 blur-[80px]" />
+        <div className="absolute bottom-8 -right-32 w-72 h-72 rounded-full bg-[#FF3355]/12 blur-[70px]" />
       </div>
 
       <div className="flex-1 flex flex-col overflow-y-auto relative z-10">

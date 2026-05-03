@@ -10,13 +10,10 @@
 | 실시간 인증 피드 | ❌ mock | 1 |
 | 그룹 채팅 | ❌ mock | 2 |
 | 알림 설정 저장 | ❌ 저장 안 됨 | 2 |
-| 통계 달력 월 이동 | ❌ 버튼 없음 | 3 |
+| 통계 달력 월 이동 | ✅ 완료 | 3 |
 | 챌린지 건의함 | ❌ mock | 3 |
 | 친구 초대 | ❌ mock | 3 |
-| 프로필 달성 회수 | ⚠️ 계산 오류 | 3 |
-| GoalDetail 통계/달력 | ❌ mock | 3 |
-| GoalDetail 인증 사진 | ❌ mock | 3 |
-| GoalDetail 메뉴 액션 | ❌ 미구현 | 3 |
+| 프로필 달성 회수 | ✅ 완료 | 3 |
 
 ---
 
@@ -106,7 +103,7 @@
 - [ ] **P1-4** `src/pages/challenge/GroupDetail.tsx`
   - `GROUPS_DETAIL` 상수 제거
   - 컴포넌트 마운트 시 `group_leaderboard` 뷰 조회 → leaderboard state 설정
-  - 활동 피드: `verifications` JOIN `profiles` JOIN `goals` 조회로 대체
+  - 활동 피드: `verifications` JOIN `profiles` 조회로 대체
   - 의존: P1-DB-1, P1-DB-2
 
 - [ ] **P1-5** `src/pages/Home.tsx`
@@ -117,7 +114,7 @@
 - [ ] **P1-6** `src/pages/Home.tsx` + `src/pages/FeedAll.tsx`
   - `FEED_ITEMS` / `ALL_FEED_ITEMS` 상수 제거
   - `verifications` 테이블에서 `photo_url IS NOT NULL` + `status = 'completed'` 조건으로 최신 20건 조회
-  - JOIN: `profiles(username, avatar_url)`, `goals(title, category)`
+  - JOIN: `profiles(username, avatar_url)`
   - 의존: P1-DB-2
 
 ---
@@ -233,7 +230,7 @@
 
 ### 코드 작업
 
-- [ ] **P3-1** `src/pages/Stats.tsx`
+- [x] **P3-1** `src/pages/Stats.tsx` — codex
   - `calOffset` state 추가 (0 = 이번 달)
   - `CAL_YEAR`, `CAL_MONTH`, `CAL_TODAY`를 `calOffset` 기반으로 동적 계산
   - `ChevronLeft` onClick: `setCalOffset(o => o - 1)`
@@ -254,48 +251,24 @@
   - 공유 버튼: `navigator.share()` → fallback `navigator.clipboard.writeText()`
   - 의존: P3-DB-2
 
-- [ ] **P3-4** `src/pages/Profile.tsx:53`
-  - `totalDone` 계산 수정
-  ```ts
-  // 수정 전
-  const totalDone = goals.reduce((s, g) => s + g.streak, 0);
-  // 수정 후
-  const { verificationHistory } = useApp();
-  const totalDone = verificationHistory.filter(v => v.status === "completed").length;
-  ```
-  - 의존: 없음 (독립)
-
-- [ ] **P3-5** `src/pages/GoalDetail.tsx` — 통계 & 달력 실제 데이터 연결
-  - `GOALS` mock 상수 제거 (hardcoded `total`, `completionRate`, `sub`, `streak`)
-  - `verificationHistory`에서 `goal_id === goalId` 필터 후 아래 계산:
-    ```ts
-    const myVerifs = verificationHistory.filter(v => v.goal_id === goalId && v.status === 'completed');
-    const total = myVerifs.length;
-    const rate = Math.round(total / Math.max(daysSinceCreated, 1) * 100);
-    ```
-  - `buildCalendar`의 `isDone(d)`: 현재 가짜 수식 → `myVerifs`에 해당 날짜 인증 있는지로 교체
-  - 의존: 없음 (verificationHistory 이미 AppContext에 있음)
-
-- [ ] **P3-6** `src/pages/GoalDetail.tsx` — 인증 사진 실제 데이터 연결
-  - `VERIFY_PHOTOS` mock 상수 제거 (emoji gradient 썸네일 4개 하드코딩)
-  - `verificationHistory`에서 `goal_id === goalId && photo_url != null` 필터 → 최신순 렌더
-  - 사진 없을 때: "아직 인증 사진이 없어요" 빈 상태 표시
-  - 의존: P3-5
-
-- [ ] **P3-7** `src/pages/GoalDetail.tsx` — 메뉴 액션 구현
-  - **삭제**: confirm 다이얼로그 → `supabase.from('goals').delete().eq('id', goalId)` → AppContext `goals` 갱신 → `navigate(-1)`
-  - **일시정지**: `supabase.from('goals').update({ status: 'paused' }).eq('id', goalId)` → AppContext 상태 갱신 → UI 반영
-  - **수정**: `/goal-setting/category?edit=goalId` 라우트로 이동 (해당 라우트가 없으면 별도 모달로 대체)
-  - 현재 세 버튼 모두 `onClick={() => setMenuOpen(false)}` — 이 부분 교체
+- [x] **P3-4** `src/pages/Profile.tsx` — 완료 — codex
+  - `totalDone`: verificationHistory 기반으로 수정
+  - `maxStreak`: profile.streak_count 사용
+  - `성공률`: 최근 30일 인증 일수 기반으로 계산
   - 의존: 없음 (독립)
 
 ---
 
 ## 빠른 버그픽스 (언제든 독립 처리 가능)
 
-- [ ] **BUG-1** `src/pages/Profile.tsx:53` — 달성 회수 계산 오류 (= P3-4와 동일)
-- [ ] **BUG-2** `src/pages/Stats.tsx` — 통계 헤더 `Calendar` 버튼 빈 onClick 제거 또는 달력 스크롤로 연결
-- [ ] **BUG-3** `src/pages/GoalDetail.tsx` — `isDone()` 가짜 수식, 실제 verifications 기반으로 교체 (= P3-5의 일부)
+- [x] **BUG-1** `src/pages/Profile.tsx:53` — 달성 회수 계산 오류 — codex
+- [x] **BUG-2** `src/pages/Stats.tsx` — 통계 헤더 `Calendar` 버튼 빈 onClick 제거 또는 달력 스크롤로 연결 — codex
+
+---
+
+## UI/UX 개선
+
+- [x] **UX-1** `src/pages/challenge/GroupDetail.tsx` — 그룹 상세 1차 UI 구조 정리 (히어로 축소, 컴팩트 바 단순화, 우상단 액션 메뉴, 참여 상태별 카드, 활동 빈 상태) — codex
 
 ---
 

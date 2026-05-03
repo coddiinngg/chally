@@ -68,7 +68,10 @@ export function ActivityPhoto() {
         <button
           onClick={() => {
             if (!groupId || groupId === "feed") { navigate(-1); return; }
-            navigate(`/challenge/group/${groupId}`, { state: { tab: "activity", skipAnimation: true } });
+            navigate(`/challenge/group/${groupId}`, {
+              replace: true,
+              state: { tab: "activity", skipAnimation: true, fromActivityPhoto: true },
+            });
           }}
           className="w-10 h-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-sm active:bg-black/50 transition-colors"
         >

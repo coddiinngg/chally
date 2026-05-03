@@ -15,7 +15,7 @@ export function VerifySelect() {
   }, []);
 
   function pick(key: VerifyTypeKey) {
-    beginVerification({ goalId: null, verifyType: key });
+    beginVerification({ verifyType: key });
     navigate(`/verify/guide/${key}`);
   }
 

@@ -50,7 +50,6 @@ function mergeSignals(signals: AbortSignal[]): AbortController {
 export async function verifyPhotoWithAI(
   file: File,
   key: VerifyTypeKey,
-  goalId: string | null,
   externalSignal?: AbortSignal,
 ): Promise<VerifyResult> {
   if (file.type && !file.type.startsWith("image/")) {
@@ -64,7 +63,6 @@ export async function verifyPhotoWithAI(
 
   const base64 = await compressImage(file);
 
-  // 30초 타임아웃 + 외부 signal 병합
   const timeoutCtrl = new AbortController();
   const timeout = setTimeout(() => timeoutCtrl.abort(), 30_000);
   const combined = externalSignal
@@ -80,7 +78,7 @@ export async function verifyPhotoWithAI(
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ image: base64, verifyType: key, goalId }),
+        body: JSON.stringify({ image: base64, verifyType: key }),
         signal: combined.signal,
       },
     );

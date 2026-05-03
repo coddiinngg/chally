@@ -17,10 +17,12 @@
 
 html, body {
   height: 100%;
+  min-height: 100%;
 }
 
 #root {
   height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -28,6 +30,8 @@ html, body {
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  background: #0b0d12;
+  overscroll-behavior: none;
 }
 
 /* ── 다크모드 CSS 변수 (인라인 스타일에서 참조) ── */
@@ -38,40 +42,76 @@ body {
   --c-input-bg: #F1F5F9;
   --c-input-text: #334155;
   --c-border: rgba(0,0,0,0.05);
+  --c-control-bg: #F1F5F9;
+  --c-control-text: #64748b;
+  --c-page: #F6F7FA;
+  --c-card: #ffffff;
+  --c-muted-card: #F8FAFC;
+  --c-accent: #FF3355;
+  --c-accent-soft: #FFE8EC;
+  --c-shadow: 0 2px 12px rgba(15,23,42,0.06);
 }
 html.dark {
-  --c-surface: #1c1c1e;
-  --c-bubble-bg: #2a2a2a;
-  --c-bubble-text: #e2e8f0;
-  --c-input-bg: #1e1e1e;
-  --c-input-text: #cbd5e1;
-  --c-border: rgba(255,255,255,0.07);
+  color-scheme: dark;
+  --c-surface: #12161E;
+  --c-bubble-bg: #171B24;
+  --c-bubble-text: #E5E7EB;
+  --c-input-bg: #151A23;
+  --c-input-text: #E2E8F0;
+  --c-border: rgba(255,255,255,0.08);
+  --c-control-bg: #1A202B;
+  --c-control-text: #A6AFBE;
+  --c-page: #090B10;
+  --c-card: #12161E;
+  --c-muted-card: #171C25;
+  --c-accent: #FF6B83;
+  --c-accent-soft: #3A1620;
+  --c-shadow: 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.app-shell {
+  height: 100svh;
+  min-height: 100svh;
+  max-height: 100svh;
+  box-shadow: 0 0 42px rgba(15, 23, 42, 0.14);
+}
+
+@supports (height: 100dvh) {
+  .app-shell {
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+  }
+}
+
+html.dark .app-shell {
+  box-shadow: none;
 }
 
 /* ── 다크모드 전역 오버라이드 ── */
 html.dark,
 html.dark body,
 html.dark #root {
-  background-color: #000000;
+  background-color: #090B10;
   color: #f1f5f9;
 }
 
 /* 배경색 */
-html.dark [class*="bg-white"]         { background-color: #111111 !important; }
-html.dark [class*="bg-slate-50"]      { background-color: #0d0d0d !important; }
-html.dark [class*="bg-slate-100"]     { background-color: #1e1e1e !important; }
-html.dark [class*="bg-[#F8F8FA]"]    { background-color: #000000 !important; }
-html.dark [class*="bg-[#FAFAFA]"]    { background-color: #000000 !important; }
-html.dark [class*="bg-[#F2F2F7]"]    { background-color: #000000 !important; }
+html.dark [class*="bg-white"]         { background-color: var(--c-card) !important; }
+html.dark [class*="bg-slate-50"]      { background-color: var(--c-muted-card) !important; }
+html.dark [class*="bg-slate-100"]     { background-color: #1A202B !important; }
+html.dark [class*="bg-[#F8F8FA]"]    { background-color: var(--c-page) !important; }
+html.dark [class*="bg-[#FAFAFA]"]    { background-color: var(--c-page) !important; }
+html.dark [class*="bg-[#F2F2F7]"]    { background-color: var(--c-page) !important; }
 
 /* 텍스트 */
 html.dark [class*="text-slate-900"]  { color: #f1f5f9 !important; }
 html.dark [class*="text-slate-800"]  { color: #e2e8f0 !important; }
 html.dark [class*="text-slate-700"]  { color: #cbd5e1 !important; }
-html.dark [class*="text-slate-600"]  { color: #94a3b8 !important; }
-html.dark [class*="text-slate-500"]  { color: #64748b !important; }
-html.dark [class*="text-slate-400"]  { color: #4a5568 !important; }
-html.dark [class*="text-slate-300"]  { color: #374151 !important; }
+html.dark [class*="text-slate-600"]  { color: #A6AFBE !important; }
+html.dark [class*="text-slate-500"]  { color: #8A94A6 !important; }
+html.dark [class*="text-slate-400"]  { color: #6F7A8D !important; }
+html.dark [class*="text-slate-300"]  { color: #5A6577 !important; }
 
 /* 테두리 */
 html.dark [class*="border-slate-100"]        { border-color: #2d2d3f !important; }
@@ -80,20 +120,48 @@ html.dark [class*="border-black/[0.04]"],
 html.dark [class*="border-black/[0.05]"]     { border-color: rgba(255,255,255,0.07) !important; }
 
 /* 그림자 */
-html.dark [class*="shadow-"]                 { box-shadow: 0 2px 12px rgba(0,0,0,0.5) !important; }
+html.dark [class*="shadow-"]                 { box-shadow: var(--c-shadow) !important; }
+html.dark [style*="rgba(255,51,85"],
+html.dark [style*="rgba(255, 51, 85"],
+html.dark [style*="#FF3355"],
+html.dark [style*="#ff5570"],
+html.dark [style*="#FF6680"] {
+  box-shadow: none !important;
+}
+html.dark button[style*="linear-gradient"],
+html.dark a[style*="linear-gradient"] {
+  box-shadow: none !important;
+}
 
 /* 추가 배경색 */
-html.dark [class*="bg-[#F5F6FA]"]            { background-color: #000000 !important; }
-html.dark [class*="bg-[#F5F7FA]"]            { background-color: #000000 !important; }
+html.dark [class*="bg-[#F5F6FA]"]            { background-color: var(--c-page) !important; }
+html.dark [class*="bg-[#F5F7FA]"]            { background-color: var(--c-page) !important; }
 html.dark [class*="bg-slate-200"]            { background-color: #2a2a2a !important; }
-html.dark [class*="bg-[#F1F5F9]"]            { background-color: #1e1e1e !important; }
+html.dark [class*="bg-[#F1F5F9]"]            { background-color: var(--c-control-bg) !important; }
 
 /* 다크모드 레드 약화 */
-html.dark [class*="bg-[#FF3355]"]            { background-color: #99001f !important; }
-html.dark [class*="bg-[#FFE8EC]"]            { background-color: #1a0508 !important; }
-html.dark [class*="bg-[#FFF0F3]"]            { background-color: #160407 !important; }
-html.dark [class*="text-[#FF3355]"]          { color: #cc1133 !important; }
-html.dark [class*="border-[#FF3355]"]        { border-color: #99001f !important; }
+html.dark [class*="bg-[#FF3355]"]            { background-color: #D93852 !important; }
+html.dark [class*="bg-[#FFE8EC]"]            { background-color: var(--c-accent-soft) !important; }
+html.dark [class*="bg-[#FFF0F3]"]            { background-color: #2A1118 !important; }
+html.dark [class*="bg-[#FFF5F7]"]            { background-color: #211017 !important; }
+html.dark [class*="bg-[#FFD6DC]"]            { background-color: #592232 !important; }
+html.dark [class*="text-[#FF3355]"]          { color: var(--c-accent) !important; }
+html.dark [class*="text-[#CC0030]"]          { color: #FF7F94 !important; }
+html.dark [class*="border-[#FF3355]"]        { border-color: #A82A40 !important; }
+html.dark [class*="border-[#FFD6DC]"]        { border-color: rgba(255,107,131,0.22) !important; }
+
+html.dark input,
+html.dark textarea,
+html.dark select {
+  background-color: var(--c-input-bg);
+  color: var(--c-input-text);
+  border-color: var(--c-border);
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #687386;
+}
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;

@@ -63,7 +63,7 @@ function ProtectedRoute() {
 function AuthOnlyRoute() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  return (user || isPreview() || isGuestMode()) ? <Outlet /> : <Navigate to="/login" replace />;
+  return (user || isPreview()) ? <Outlet /> : <Navigate to="/login" replace />;
 }
 
 export default function App() {

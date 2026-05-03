@@ -830,7 +830,7 @@ export function Home() {
             onClick={() => guardAction(() => {
               if (selectedGroup) {
                 const vType = selectedGroup.verifyType as VerifyTypeKey;
-                beginVerification({ goalId: null, verifyType: vType });
+                beginVerification({ verifyType: vType });
                 navigate(`/verify/guide/${vType}`);
               } else {
                 navigate("/challenge");

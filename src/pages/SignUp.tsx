@@ -1,5 +1,5 @@
 import { ChevronLeft, Eye, EyeOff, ArrowRight } from "lucide-react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { cn } from "../lib/utils";
 import { useApp } from "../contexts/AppContext";
@@ -7,8 +7,10 @@ import { useAuth } from "../contexts/AuthContext";
 
 export function SignUp() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { setNickname: saveNickname } = useApp();
   const { signUpWithEmail } = useAuth();
+  const refCode = searchParams.get("ref");
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +29,7 @@ export function SignUp() {
     setError("");
     setLoading(true);
     try {
-      await signUpWithEmail(email.trim(), password, nickname.trim());
+      await signUpWithEmail(email.trim(), password, nickname.trim(), refCode);
       saveNickname(nickname.trim());
       navigate("/login");
     } catch (err) {
@@ -81,6 +83,11 @@ export function SignUp() {
               <>비밀번호를<br />설정해주세요</>
             )}
           </h1>
+          {step === 1 && refCode && (
+            <p className="mt-3 inline-flex rounded-full bg-[#FF3355]/15 px-3 py-1.5 text-[12px] font-bold text-[#FF9DB2]">
+              초대 코드 {refCode} 적용됨
+            </p>
+          )}
         </div>
 
         {step === 1 ? (
