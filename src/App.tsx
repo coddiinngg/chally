@@ -20,6 +20,7 @@ import { NotificationSettings } from "./pages/NotificationSettings";
 import { Challenge } from "./pages/Challenge";
 import { GroupDetail } from "./pages/challenge/GroupDetail";
 import { ActivityPhoto } from "./pages/challenge/ActivityPhoto";
+import { ChallengeResult } from "./pages/challenge/ChallengeResult";
 import { Gallery } from "./pages/Gallery";
 import { Rewards } from "./pages/Rewards";
 import { Notifications } from "./pages/Notifications";
@@ -112,6 +113,7 @@ export default function App() {
               <Route path="/friends/invite" element={<FriendInvite />} />
               <Route path="/challenge/group/:groupId" element={<GroupDetail />} />
               <Route path="/challenge/group/:groupId/activity" element={<ActivityPhoto />} />
+              <Route path="/challenge/group/:groupId/result" element={<ChallengeResult />} />
               <Route path="/user/:seed" element={<UserProfile />} />
               <Route path="/feed" element={<FeedAll />} />
               <Route path="/challenge/request" element={<ChallengeRequest />} />

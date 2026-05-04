@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../lib/verifyTypes";
 import { shareOrCopy } from "../lib/share";
+import { ShareCard } from "./verify/ShareCard";
 
 const CONFETTI_COLORS = ["#FF3355", "#ff6680", "#ffb3c0", "#f97316", "#fbbf24", "#34d399", "#a78bfa"];
 
@@ -38,6 +39,7 @@ export function Success() {
   const serverPhotoUrl = (location.state as { photoUrl?: string | null } | null)?.photoUrl;
   const [mounted, setMounted] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "shared" | "copied">("idle");
+  const [showShareCard, setShowShareCard] = useState(false);
 
   // completeCurrentVerification()이 clearVerification()을 호출해 verifyType이 null이 되므로
   // 마운트 시점의 값을 미리 캡처
@@ -91,6 +93,7 @@ export function Success() {
   }
 
   return (
+    <>
     <div className="flex flex-col h-full bg-[#F5F6FA] relative overflow-hidden">
       <style>{`
         @keyframes confettiFall {
@@ -159,10 +162,13 @@ export function Success() {
           </p>
         </div>
 
-        {/* ── 인증 사진 (있을 때만) ── */}
+        {/* ── 인증 사진 (있을 때만) — 탭하면 공유 카드 열림 ── */}
         {capturedImageUrl && (
           <div className="w-full max-w-sm mb-4" style={slide(300)}>
-            <div className="relative rounded-2xl overflow-hidden aspect-[4/3]">
+            <button
+              className="relative rounded-2xl overflow-hidden aspect-[4/3] w-full active:scale-[0.98] transition-transform"
+              onClick={() => setShowShareCard(true)}
+            >
               <img
                 src={capturedImageUrl}
                 alt="인증 사진"
@@ -176,7 +182,13 @@ export function Success() {
                 <span className="text-[13px]">{vt.emoji}</span>
                 <span className="text-white font-bold text-[12px]">{vt.label} 인증</span>
               </div>
-            </div>
+              {/* 탭 힌트 */}
+              <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full"
+                style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}>
+                <Share2 className="w-3 h-3 text-white" />
+                <span className="text-white text-[10px] font-bold">공유</span>
+              </div>
+            </button>
           </div>
         )}
 
@@ -204,5 +216,15 @@ export function Success() {
         </button>
       </div>
     </div>
+
+    {/* ── 인증 공유 카드 오버레이 ── */}
+    {showShareCard && capturedImageUrl && (
+      <ShareCard
+        imageUrl={capturedImageUrl}
+        defaultTitle={capturedGroup?.title ?? vt.label}
+        onClose={() => setShowShareCard(false)}
+      />
+    )}
+    </>
   );
 }

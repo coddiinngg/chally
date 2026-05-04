@@ -96,9 +96,13 @@ supabase/
 앱 전반의 비인증 상태를 관리합니다.
 
 - **verificationHistory**: Supabase `verifications` 테이블 실연동
-- **groups**: 현재 하드코딩 mock 데이터 (6개 그룹), DB 연동 미완
+- **groups**: Supabase `groups` + `group_members` 실연동
+  - 앱 화면의 기존 그룹 ID `"1"~"6"`은 `groups.legacy_id`로 유지
+  - 실제 DB membership 저장은 `group_members.group_id` UUID 기준
+  - 로그인/재로그인 시 `group_members`에서 참여 상태를 다시 로드
 - **notifications**: Supabase `notifications` 테이블 실연동
 - **verification 흐름**: `beginVerification` → `setVerificationImage` → `completeCurrentVerification`
+- **theme**: `localStorage`에 저장
 
 ## Supabase
 
@@ -109,21 +113,40 @@ supabase/
 | 테이블 | 설명 |
 |--------|------|
 | `profiles` | 사용자 프로필 (auth.users 확장), streak, XP, recovery_tickets |
-| `verifications` | 인증 기록 (photo_url, xp_earned, status) |
+| `verifications` | 인증 기록 (group_id, verify_type, photo_url, xp_earned, status) |
 | `groups` | 챌린지 그룹 |
 | `group_members` | 그룹 멤버 (admin/member role) |
+| `activity_posts` | 인증 성공으로 생성되는 그룹 활동글 |
+| `activity_reactions` | 활동글 유저별 이모지 리액션 |
 | `notifications` | 알림 (type: badge/group/rank/streak) |
+| `notification_settings` | 알림 설정 |
+| `challenge_suggestions` | 챌린지 건의 |
+| `challenge_suggestion_votes` | 챌린지 건의 응원 |
+| `challenge_suggestion_comments` | 챌린지 건의 댓글 |
+| `challenge_suggestion_subscriptions` | 챌린지 건의 알림받기 |
+| `referrals` | 추천 가입 보상 기록 |
+| `friend_invites` | 친구 초대 대상 기록 |
+| `invite_events` | 초대 링크/코드 공유 이벤트 |
 | `verify_attempts` | AI 인증 시도 횟수 추적 (rate limit용) |
 
 ### RLS 정책 요약
 - 모든 테이블 RLS 활성화
 - 기본 원칙: 자신의 데이터만 CRUD
 - `groups`: 공개 그룹은 전체 조회 가능
+- `group_members`: 현재 앱에서는 자신의 가입 기록만 조회 가능
+- `activity_posts`: 공개 조회, 본인이 가입한 그룹에는 본인 활동글 insert 가능
+- `activity_reactions`: 공개 조회, 본인 리액션만 insert/update/delete
+- `challenge_suggestions`: 공개 조회, 로그인 유저 작성/응원/댓글/구독
 - `notifications`: INSERT는 service role만 (Edge Function)
 
 ### 트리거
 - `on_auth_user_created`: 회원가입 시 `profiles` 자동 생성
 - `profiles_updated_at`: `updated_at` 자동 갱신
+- `adjust_group_member_count`: 그룹 가입/탈퇴 시 `groups.member_count` 증감
+- `refresh_challenge_suggestion_counts`: 건의 응원/댓글 카운트 갱신
+
+### RPC
+- `get_group_leaderboard(group_id, limit)`: 그룹 멤버와 그룹별 인증 기록 기준 리더보드 반환
 
 ### Storage 버킷
 - `verifications` (공개): 인증 사진 저장 (`{userId}/{timestamp}.jpg`)
@@ -138,10 +161,11 @@ supabase secrets set GEMINI_API_KEY=<key>
 ```
 
 ### 인증 흐름
-1. 클라이언트가 base64 이미지 + `verifyType` 전송
+1. 클라이언트가 base64 이미지 + `verifyType` + `groupId` 전송
 2. Rate limit 확인 (사용자 일 20회)
-3. Gemini 2.0 Flash Lite로 AI 판정
-4. 통과 시: Storage 업로드 → `verifications` INSERT → XP +10
+3. 그룹 인증이면 `group_members` 멤버십 확인
+4. Gemini 2.0 Flash Lite로 AI 판정
+5. 통과 시: Storage 업로드 → `verifications` INSERT → `activity_posts` INSERT → XP +10
 
 ### 인증 타입 (VerifyTypeKey)
 | key | 라벨 |
@@ -164,10 +188,24 @@ supabase secrets set GEMINI_API_KEY=<key>
 상세 내용은 **[TODO.md](./TODO.md)** 참조.
 
 요약:
-- **그룹 전체**: DB 연동 없이 mock 데이터 — `AppContext.tsx` `DEFAULT_GROUPS`, `GroupDetail.tsx` `GROUPS_DETAIL`
-- **채팅**: 로컬 state만, Supabase Realtime 미연동
-- **피드**: Unsplash 하드코딩, 실제 `verifications.photo_url` 미사용
-- **랭킹**: 달성률/streak 실계산 없음
-- **알림 설정**: 토글 저장 안 됨 (`profiles` 컬럼 없음)
-- **건의함**: mock 데이터, DB 미연동
-- **친구 초대**: mock 데이터, invite_code 미구현
+- **그룹 상세 활동 피드**: `activity_posts` 우선 로드, 데이터 없을 때 fallback mock 잔존
+- **홈 피드**: `activity_posts` 우선 로드, 데이터 없을 때 fallback mock 잔존
+- **홈/그룹 상세 랭킹**: `get_group_leaderboard` 우선 로드, 데이터 없을 때 fallback mock 잔존
+- **홈 채팅**: 표시 데이터 mock 잔존
+- **그룹 채팅**: Supabase Realtime 미연동
+- **소셜 로그인**: 버튼 배치만 유지, provider 실제 연결 미완
+
+## 최근 적용된 주요 마이그레이션
+
+| 마이그레이션 | 내용 |
+|-------------|------|
+| `20260503000000_notification_settings.sql` | 알림 설정 테이블 |
+| `20260503001000_avatar_storage.sql` | 프로필 이미지 Storage |
+| `20260503002000_challenge_suggestions.sql` | 챌린지 건의/응원/댓글/구독 |
+| `20260503003000_referrals.sql` | 추천코드/추천 보상 |
+| `20260503003100_invite_events.sql` | 친구 초대 이벤트 |
+| `20260503004000_group_members_app_mapping.sql` | 그룹 DB 매핑 및 멤버십 연결 |
+| `20260503004100_fix_group_members_select_policy.sql` | 그룹 멤버십 조회 RLS 수정 |
+| `20260504000000_activity_posts_reactions.sql` | 활동글/리액션 및 그룹별 인증 저장 |
+| `20260504001000_challenge_lifecycle.sql` | 그룹 모집/진행 기간 컬럼 |
+| `20260504002000_group_leaderboard_rpc.sql` | 그룹 리더보드 RPC |

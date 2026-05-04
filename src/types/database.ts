@@ -37,6 +37,8 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          group_id: string | null;
+          verify_type: string | null;
           verified_at: string;
           photo_url: string | null;
           status: 'completed' | 'skipped';
@@ -45,12 +47,14 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
+          group_id?: string | null;
+          verify_type?: string | null;
           verified_at?: string;
           photo_url?: string | null;
           status?: 'completed' | 'skipped';
           xp_earned?: number;
         };
-        Update: Partial<Pick<Database['public']['Tables']['verifications']['Insert'], 'photo_url' | 'status' | 'xp_earned'>>;
+        Update: Partial<Pick<Database['public']['Tables']['verifications']['Insert'], 'group_id' | 'verify_type' | 'photo_url' | 'status' | 'xp_earned'>>;
         Relationships: [];
       };
       groups: {
@@ -76,6 +80,10 @@ export interface Database {
           is_public: boolean;
           created_by: string | null;
           created_at: string;
+          recruit_start: string | null;
+          recruit_end: string | null;
+          challenge_start: string | null;
+          challenge_end: string | null;
         };
         Insert: {
           id?: string;
@@ -98,6 +106,10 @@ export interface Database {
           max_members?: number;
           is_public?: boolean;
           created_by?: string | null;
+          recruit_start?: string | null;
+          recruit_end?: string | null;
+          challenge_start?: string | null;
+          challenge_end?: string | null;
         };
         Update: Partial<Omit<Database['public']['Tables']['groups']['Insert'], 'created_by' | 'id'>>;
         Relationships: [];
@@ -109,12 +121,14 @@ export interface Database {
           user_id: string;
           role: 'admin' | 'member';
           joined_at: string;
+          last_verified_at: string | null;
         };
         Insert: {
           id?: string;
           group_id: string;
           user_id: string;
           role?: 'admin' | 'member';
+          last_verified_at?: string | null;
         };
         Update: Pick<Database['public']['Tables']['group_members']['Insert'], 'role'>;
         Relationships: [];
@@ -308,9 +322,70 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      activity_posts: {
+        Row: {
+          id: string;
+          group_id: string;
+          user_id: string;
+          verification_id: string | null;
+          verify_type: string;
+          photo_url: string | null;
+          message: string;
+          author_name: string | null;
+          author_avatar_url: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          group_id: string;
+          user_id: string;
+          verification_id?: string | null;
+          verify_type: string;
+          photo_url?: string | null;
+          message: string;
+          author_name?: string | null;
+          author_avatar_url?: string | null;
+        };
+        Update: Partial<Pick<Database['public']['Tables']['activity_posts']['Insert'], 'message' | 'author_name' | 'author_avatar_url'>>;
+        Relationships: [];
+      };
+      activity_reactions: {
+        Row: {
+          activity_post_id: string;
+          user_id: string;
+          emoji: '❤️' | '🔥' | '👍' | '😮' | '🎉';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          activity_post_id: string;
+          user_id: string;
+          emoji: '❤️' | '🔥' | '👍' | '😮' | '🎉';
+        };
+        Update: Pick<Database['public']['Tables']['activity_reactions']['Insert'], 'emoji'>;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
-    Functions: Record<never, never>;
+    Functions: {
+      get_group_leaderboard: {
+        Args: {
+          p_group_id: string;
+          p_limit?: number;
+        };
+        Returns: {
+          rank: number;
+          user_id: string;
+          username: string | null;
+          avatar_url: string | null;
+          total_done: number;
+          recent_done: number;
+          rate: number;
+          streak: number;
+          is_me: boolean;
+        }[];
+      };
+    };
     Enums: Record<never, never>;
     CompositeTypes: Record<never, never>;
   };
@@ -328,3 +403,6 @@ export type ChallengeSuggestionCommentRecord = Database['public']['Tables']['cha
 export type ReferralRecord = Database['public']['Tables']['referrals']['Row'];
 export type FriendInviteRecord = Database['public']['Tables']['friend_invites']['Row'];
 export type InviteEventRecord = Database['public']['Tables']['invite_events']['Row'];
+export type ActivityPostRecord = Database['public']['Tables']['activity_posts']['Row'];
+export type ActivityReactionRecord = Database['public']['Tables']['activity_reactions']['Row'];
+export type GroupLeaderboardRecord = Database['public']['Functions']['get_group_leaderboard']['Returns'][number];

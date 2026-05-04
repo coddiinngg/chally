@@ -5,6 +5,7 @@ import { cn } from "../lib/utils";
 import React, { useState, useEffect } from "react";
 import { useApp } from "../contexts/AppContext";
 import { useGuestGuard } from "../contexts/GuestGuardContext";
+import { getPhase, shouldHide, canJoin, phaseLabel, isLateJoiner } from "../lib/challengeUtils";
 
 // 카테고리 아이콘 + 배경
 const CAT_META: Record<string, { icon: React.ElementType; bg: string; color: string; glow: string; grad: string; cardGrad: string; iconColor: string }> = {
@@ -15,9 +16,10 @@ const CAT_META: Record<string, { icon: React.ElementType; bg: string; color: str
 };
 
 const STATUS_STYLE: Record<string, string> = {
+  "모집중":  "text-blue-600 bg-blue-50",
   "진행중":  "text-emerald-600 bg-emerald-50",
-  "인기":    "text-[#FF3355] bg-[#FFE8EC]",
   "마감임박": "text-amber-600 bg-amber-50",
+  "종료":    "text-slate-400 bg-slate-100",
 };
 
 const CATS = ["전체", "운동", "식단", "학습", "생활"];
@@ -44,7 +46,7 @@ export function Challenge() {
   const [filterMode, setFilterMode] = useState<"전체" | "참여중">("전체");
   const [showDropdown, setShowDropdown] = useState(false);
   const [mounted,   setMounted]   = useState(false);
-  const [joinTarget, setJoinTarget] = useState<{ id: string; title: string; desc: string; members: number } | null>(null);
+  const [joinTarget, setJoinTarget] = useState<{ id: string; title: string; desc: string; members: number; challengeStart: string | null; challengeEnd: string | null } | null>(null);
   const [leaveTarget, setLeaveTarget] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
@@ -59,6 +61,11 @@ export function Challenge() {
   });
 
   const filtered = groups
+    .filter((g) => {
+      const phase = getPhase(g.challengeStart, g.challengeEnd, g.recruitEnd);
+      if (!g.joined && shouldHide(phase, g.rate)) return false;
+      return true;
+    })
     .filter((g) => filterMode === "전체" || g.joined)
     .filter((g) => activeCat === "전체" || g.category === activeCat)
     .filter((g) => !searchQuery || g.title.includes(searchQuery) || g.desc.includes(searchQuery))
@@ -197,7 +204,14 @@ export function Challenge() {
 
         {/* 전체 그룹 리스트 */}
         <div className="px-4 pt-3 pb-6 space-y-2.5">
-          {filtered.map(({ id, title, desc, members, rate, status, category, joined: isJoined }, i) => {
+          {filtered.map((g, i) => {
+            const { id, title, desc, members, rate, category, joined: isJoined } = g;
+            const phase = getPhase(g.challengeStart, g.challengeEnd, g.recruitEnd);
+            const joinable = canJoin(phase, rate);
+            const label = phaseLabel(phase);
+            const tagStyle = STATUS_STYLE[label] ?? "text-slate-500 bg-slate-100";
+            const isEnded = phase === "ended";
+
             return (
               <div
                 key={id}
@@ -213,8 +227,8 @@ export function Challenge() {
                       {isJoined && (
                         <span className="text-[11px] font-black text-[#FF3355] bg-[#FFE8EC] px-2 py-0.5 rounded-full">참여중</span>
                       )}
-                      <span className={cn("text-[11px] font-bold px-2 py-0.5 rounded-full", STATUS_STYLE[status])}>
-                        {status}
+                      <span className={cn("text-[11px] font-bold px-2 py-0.5 rounded-full", tagStyle)}>
+                        {label}
                       </span>
                     </div>
                   </div>
@@ -223,7 +237,7 @@ export function Challenge() {
                   <h3 className="font-black text-[16px] text-slate-900 leading-snug mb-0.5">{title}</h3>
                   <p className="text-[13px] text-slate-400 mb-3 leading-relaxed">{desc}</p>
 
-                  {/* 진행바 */}
+                  {/* 크루 달성률 바 */}
                   <div className="flex items-center gap-3 mb-2.5">
                     <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                       <div
@@ -232,10 +246,11 @@ export function Challenge() {
                           width: mounted ? `${rate}%` : "0%",
                           transition: `width 1s cubic-bezier(0.4,0,0.2,1) ${i * 70 + 300}ms`,
                           boxShadow: "0 0 8px rgba(255,51,85,0.3)",
+                          opacity: isEnded ? 0.35 : 1,
                         }}
                       />
                     </div>
-                    <span className="text-[14px] font-black text-[#FF3355] shrink-0 tabular-nums w-10 text-right">{rate}%</span>
+                    <span className={cn("text-[14px] font-black shrink-0 tabular-nums w-10 text-right", isEnded ? "text-slate-300" : "text-[#FF3355]")}>{rate}%</span>
                   </div>
 
                   {/* 멤버 수 */}
@@ -243,29 +258,37 @@ export function Challenge() {
                     <Users className="w-3.5 h-3.5" />
                     <span className="text-[12px]">{members}명 참여 중</span>
                   </div>
+
+                  {/* 저조한 크루 경고 (39% 이하) */}
+                  {rate <= 39 && phase !== "ended" && (
+                    <div className="mt-2.5 px-3 py-2 bg-red-50 rounded-xl">
+                      <p className="text-[11px] text-red-500 font-semibold">앞으로 매일 인증해야 챌린지를 달성할 수 있어요!</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* 참여 버튼 */}
                 <div className="px-4 pb-4 pt-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isJoined) {
-                        guardAction(() => setLeaveTarget({ id, title }));
-                      } else {
-                        guardAction(() => setJoinTarget({ id, title, desc, members }));
-                      }
-                    }}
-                    className={cn(
-                      "w-full py-2.5 rounded-xl text-[13px] font-bold transition-all duration-200 active:scale-[0.98]",
-                      isJoined
-                        ? "bg-slate-100 text-slate-400"
-                        : "text-white"
-                    )}
-                    style={!isJoined ? { background: "linear-gradient(115deg,#FF5C7A,#FF3355)", boxShadow: "0 6px 16px -4px rgba(255,51,85,0.45)" } : undefined}
-                  >
-                    {isJoined ? "참여 중 · 탈퇴" : "참여하기"}
-                  </button>
+                  {isJoined ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); guardAction(() => setLeaveTarget({ id, title })); }}
+                      className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-400 transition-all duration-200 active:scale-[0.98]"
+                    >
+                      참여 중 · 탈퇴
+                    </button>
+                  ) : joinable ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); guardAction(() => setJoinTarget({ id, title, desc, members, challengeStart: g.challengeStart, challengeEnd: g.challengeEnd })); }}
+                      className="w-full py-2.5 rounded-xl text-[13px] font-bold text-white transition-all duration-200 active:scale-[0.98]"
+                      style={{ background: "linear-gradient(115deg,#FF5C7A,#FF3355)", boxShadow: "0 6px 16px -4px rgba(255,51,85,0.45)" }}
+                    >
+                      참여하기
+                    </button>
+                  ) : (
+                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-300 text-center">
+                      {phase === "ended" ? "종료된 챌린지" : phase === "recruit" ? "모집 준비중" : "참가 불가"}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -335,6 +358,15 @@ export function Challenge() {
                 <span className="text-[13px]">현재 {joinTarget.members}명 참여 중</span>
               </div>
             </div>
+
+            {/* 늦은 참가자 안내 */}
+            {isLateJoiner(joinTarget.challengeStart, joinTarget.challengeEnd, new Date().toISOString()) && (
+              <div className="mb-4 px-4 py-3 bg-amber-50 rounded-2xl border border-amber-100">
+                <p className="text-[12px] text-amber-700 font-semibold leading-snug">
+                  이 챌린지를 지금 참가해도 챌린지 참가권을 얻지 못해요.
+                </p>
+              </div>
+            )}
 
             <div className="h-px bg-slate-100 mb-5" />
 

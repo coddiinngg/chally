@@ -1,8 +1,13 @@
 import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import { supabase } from "../../lib/supabase";
+import type { ActivityEmoji } from "../../lib/activity";
 
 interface ActivityPhotoState {
+  postId?: string;
+  userId?: string;
   imgSrc?: string;
   grad: [string, string];
   name: string;
@@ -10,17 +15,19 @@ interface ActivityPhotoState {
   time: string;
   msg: string;
   type: string;
+  reactionCount?: number;
+  myReaction?: string | null;
 }
 
-const REACTIONS = ["❤️", "🔥", "👍", "😮", "🎉"];
+const REACTIONS: ActivityEmoji[] = ["❤️", "🔥", "👍", "😮", "🎉"];
 
 export function ActivityPhoto() {
   const navigate = useNavigate();
-  const { groupId } = useParams<{ groupId: string }>();
+  const { user } = useAuth();
   const { state } = useLocation() as { state: ActivityPhotoState | null };
 
-  const [liked, setLiked]           = useState<string | null>(null);
-  const [likeCount, setLikeCount]   = useState(Math.floor(Math.random() * 20) + 3);
+  const [liked, setLiked]           = useState<ActivityEmoji | null>((state?.myReaction as ActivityEmoji | null | undefined) ?? null);
+  const [likeCount, setLikeCount]   = useState(state?.reactionCount ?? 0);
   const [showPicker, setShowPicker] = useState(false);
 
   if (!state) {
@@ -28,15 +35,43 @@ export function ActivityPhoto() {
     return null;
   }
 
-  const { imgSrc, grad, name, seed, time, msg } = state;
+  const { postId, userId, imgSrc, grad, name, seed, time, msg } = state;
 
-  function handleReact(emoji: string) {
+  async function handleReact(emoji: ActivityEmoji) {
+    if (!postId) {
+      setShowPicker(false);
+      return;
+    }
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const prevLiked = liked;
+    const prevCount = likeCount;
+
     if (liked === emoji) {
       setLiked(null);
-      setLikeCount(c => c - 1);
+      setLikeCount(c => Math.max(0, c - 1));
+      const { error } = await supabase
+        .from("activity_reactions")
+        .delete()
+        .eq("activity_post_id", postId)
+        .eq("user_id", user.id);
+      if (error) {
+        setLiked(prevLiked);
+        setLikeCount(prevCount);
+      }
     } else {
       if (!liked) setLikeCount(c => c + 1);
       setLiked(emoji);
+      const { error } = await supabase
+        .from("activity_reactions")
+        .upsert({ activity_post_id: postId, user_id: user.id, emoji });
+      if (error) {
+        setLiked(prevLiked);
+        setLikeCount(prevCount);
+      }
     }
     setShowPicker(false);
   }
@@ -66,13 +101,7 @@ export function ActivityPhoto() {
       {/* 상단 네비 */}
       <div className="relative z-10 flex items-center px-4 pt-5 pb-2 shrink-0">
         <button
-          onClick={() => {
-            if (!groupId || groupId === "feed") { navigate(-1); return; }
-            navigate(`/challenge/group/${groupId}`, {
-              replace: true,
-              state: { tab: "activity", skipAnimation: true, fromActivityPhoto: true },
-            });
-          }}
+          onClick={() => navigate(-1)}
           className="w-10 h-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-sm active:bg-black/50 transition-colors"
         >
           <ChevronLeft className="w-5 h-5 text-white" />
@@ -84,7 +113,7 @@ export function ActivityPhoto() {
         {/* 유저 정보 */}
         <button
           className="flex items-center gap-2.5 mb-3 active:opacity-70 transition-opacity"
-          onClick={() => navigate(`/user/${seed}`)}
+          onClick={() => navigate(`/user/${userId ?? seed}`)}
         >
           <img
             src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`}

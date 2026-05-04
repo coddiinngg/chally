@@ -1,19 +1,28 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ChevronLeft, Share2, Flame, Crown, Copy, Check, X, Camera, MoreHorizontal, LogOut } from "lucide-react";
+import { ChevronLeft, Share2, Flame, Crown, Copy, Check, X, Camera, MoreHorizontal, LogOut, AlertTriangle } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { cn } from "../../../lib/utils";
 import { useApp } from "../../../contexts/AppContext";
+import { useAuth } from "../../../contexts/AuthContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../../../lib/verifyTypes";
+import { formatActivityTime, loadActivityFeed, type ActivityFeedItem } from "../../../lib/activity";
+import { getPhase, getBenefitGrade } from "../../../lib/challengeUtils";
+import { loadGroupLeaderboard, type LeaderboardItem } from "../../../lib/leaderboard";
 
 type ActivityItem = {
+  id?: string;
+  userId?: string;
   name: string; seed: string; time: string; msg: string;
   type: "verify" | "streak" | "rank" | "comment";
   grad: [string, string];
+  photoUrl?: string | null;
+  reactionCount?: number;
+  myReaction?: string | null;
 };
 
 const GROUPS_DETAIL: Record<string, {
   rule: string;
-  leaderboard: { rank: number; name: string; seed: string; streak: number; rate: number; isMe?: boolean }[];
+  leaderboard: { rank: number; name: string; seed: string; avatarUrl?: string | null; userId?: string; streak: number; rate: number; isMe?: boolean }[];
   activity: ActivityItem[];
 }> = {
   "1": {
@@ -175,14 +184,19 @@ export function GroupDetailUI() {
   const navigate = useNavigate();
   const { groupId = "1" } = useParams<{ groupId: string }>();
   const { groups, joinGroup, leaveGroup, beginVerification, verificationHistory } = useApp();
-  const { state: locState } = useLocation() as { state: { tab?: "leaderboard" | "activity"; skipAnimation?: boolean; fromActivityPhoto?: boolean } | null };
+  const { user } = useAuth();
+  const { state: locState } = useLocation() as { state: { tab?: "leaderboard" | "activity" | "gallery"; skipAnimation?: boolean; fromActivityPhoto?: boolean } | null };
 
   const group  = groups.find(g => g.id === groupId) ?? groups[0];
   const detail = GROUPS_DETAIL[groupId] ?? GROUPS_DETAIL["1"];
+  const [activityPosts, setActivityPosts] = useState<ActivityFeedItem[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [leaderboardRows, setLeaderboardRows] = useState<LeaderboardItem[]>([]);
 
   const skipAnim = locState?.skipAnimation ?? false;
   const [mounted, setMounted]                   = useState(skipAnim);
-  const [tab, setTab]                           = useState<"leaderboard" | "activity">(locState?.tab ?? "leaderboard");
+  const [tab, setTab]                           = useState<"leaderboard" | "activity" | "gallery">(locState?.tab ?? "activity");
+  const [lightbox, setLightbox]                 = useState<{ url: string; name: string; seed: string; time: string } | null>(null);
   const [copied, setCopied]                     = useState(false);
   const [showInvite, setShowInvite]             = useState(false);
   const [showJoinConfirm, setShowJoinConfirm]   = useState(false);
@@ -190,7 +204,11 @@ export function GroupDetailUI() {
   const [showActionMenu, setShowActionMenu]     = useState(false);
   const [scrolled, setScrolled]                 = useState(false);
   const [showMyRate, setShowMyRate]             = useState(false);
+  const [showStartBanner, setShowStartBanner]   = useState(false);
+  const [showLowRateAlert, setShowLowRateAlert] = useState(false);
+  const [showLeave72h, setShowLeave72h]         = useState(false);
   const scrollRef                               = useRef<HTMLDivElement>(null);
+  const tabBarRef                               = useRef<HTMLDivElement>(null);
   const scrollKey                               = `gd-scroll-${groupId}`;
 
   useEffect(() => {
@@ -216,6 +234,46 @@ export function GroupDetailUI() {
     };
   }, []);
 
+  const groupDbId = group?.dbId ?? null;
+  const phase = getPhase(group.challengeStart, group.challengeEnd, group.recruitEnd);
+
+  // 챌린지 시작 안내 배너: 참여중이고 오늘이 챌린지 시작일인 경우
+  useEffect(() => {
+    if (!group.joined || !group.challengeStart) return;
+    const start = new Date(group.challengeStart);
+    const now = new Date();
+    const isStartDay = start.toDateString() === now.toDateString();
+    const bannerKey = `start-banner-${groupId}`;
+    if (isStartDay && !sessionStorage.getItem(bannerKey)) {
+      setShowStartBanner(true);
+    }
+  }, [group.joined, group.challengeStart, groupId]);
+
+  // 저조한 크루 알림: 달성률 39% 이하이고 참여중인 경우
+  useEffect(() => {
+    if (!group.joined || group.rate > 39) return;
+    const alertKey = `low-rate-alert-${groupId}-${new Date().toDateString()}`;
+    if (!sessionStorage.getItem(alertKey)) {
+      setShowLowRateAlert(true);
+    }
+  }, [group.joined, group.rate, groupId]);
+
+  // 72시간 미인증 체크: 이 그룹의 마지막 인증이 72시간 초과인 경우
+  useEffect(() => {
+    if (!group.joined || !groupDbId) return;
+    const groupVerifs = verificationHistory.filter(
+      v => v.group_id === groupDbId && v.status === "completed"
+    );
+    if (!groupVerifs.length) return;
+    const lastVerif = groupVerifs[0]; // already sorted by desc
+    const elapsed = Date.now() - new Date(lastVerif.verified_at).getTime();
+    const hours72 = 72 * 60 * 60 * 1000;
+    const popup72Key = `leave72-${groupId}-${lastVerif.id}`;
+    if (elapsed >= hours72 && !sessionStorage.getItem(popup72Key)) {
+      setShowLeave72h(true);
+    }
+  }, [group.joined, groupDbId, verificationHistory, groupId]);
+
   const inviteLink = `${INVITE_BASE}${groupId.padStart(4, "0")}`;
   const handleCopy = () => {
     navigator.clipboard.writeText(inviteLink).catch(() => {});
@@ -223,13 +281,93 @@ export function GroupDetailUI() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const top3     = detail.leaderboard.slice(0, 3);
-  const restList = detail.leaderboard.slice(3);
+  const leaderboard = leaderboardRows.length ? leaderboardRows.map(row => ({
+    rank: row.rank,
+    name: row.name,
+    seed: row.seed,
+    userId: row.userId,
+    avatarUrl: row.avatarUrl,
+    streak: row.streak,
+    rate: row.rate,
+    isMe: row.isMe,
+  })) : detail.leaderboard;
+  const top3     = leaderboard.slice(0, 3);
+  const restList = leaderboard.slice(3);
   const top3Seeds = top3.map(r => r.seed);
   const vt       = VERIFY_TYPES[(group?.verifyType as VerifyTypeKey) ?? "step_walk"];
   const heroImg  = HERO_IMAGES[groupId] ?? HERO_IMAGES["1"];
   const actImgs  = ACTIVITY_IMGS[groupId] ?? ACTIVITY_IMGS["1"];
-  const myRank   = detail.leaderboard.find(r => r.isMe);
+  const myRank   = leaderboard.find(r => r.isMe);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadGroupActivity() {
+      if (!groupDbId) {
+        setActivityPosts([]);
+        return;
+      }
+      setActivityLoading(true);
+      try {
+        const posts = await loadActivityFeed({ groupId: groupDbId, userId: user?.id ?? null, limit: 40 });
+        if (!cancelled) setActivityPosts(posts);
+      } catch (error) {
+        console.error("Failed to load group activity", error);
+        if (!cancelled) setActivityPosts([]);
+      } finally {
+        if (!cancelled) setActivityLoading(false);
+      }
+    }
+    void loadGroupActivity();
+    return () => { cancelled = true; };
+  }, [groupDbId, user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadLeaderboard() {
+      if (!groupDbId) {
+        setLeaderboardRows([]);
+        return;
+      }
+      try {
+        const rows = await loadGroupLeaderboard(groupDbId, 30);
+        if (!cancelled) setLeaderboardRows(rows);
+      } catch (error) {
+        console.error("Failed to load leaderboard", error);
+        if (!cancelled) setLeaderboardRows([]);
+      }
+    }
+    void loadLeaderboard();
+    return () => { cancelled = true; };
+  }, [groupDbId, user?.id]);
+
+  const dbActivity: ActivityItem[] = activityPosts.map((post, index) => ({
+    id: post.id,
+    userId: post.user_id,
+    name: post.author_name ?? "챌리 유저",
+    seed: post.user_id,
+    time: formatActivityTime(post.created_at),
+    msg: post.message,
+    type: "verify",
+    grad: [["#FF3355", "#FF6680"], ["#38BDF8", "#0EA5E9"], ["#34d399", "#059669"]][index % 3] as [string, string],
+    photoUrl: post.photo_url,
+    reactionCount: post.reactionCount,
+    myReaction: post.myReaction,
+  }));
+  const activityItems = dbActivity.length ? dbActivity : detail.activity;
+
+  // 갤러리 아이템: actImgs × 3 반복 + 멤버 순환 매핑
+  const galleryItems = activityPosts.filter(post => post.photo_url).map(post => ({
+    url: post.photo_url ?? "",
+    name: post.author_name ?? "챌리 유저",
+    seed: post.user_id,
+    time: formatActivityTime(post.created_at),
+  }));
+  const fallbackGalleryItems = Array.from({ length: 12 }, (_, i) => {
+    const member = leaderboard[i % leaderboard.length];
+    const dayAgo = i === 0 ? "방금" : i < 3 ? `${i}시간 전` : `${Math.floor(i / 2)}일 전`;
+    return { url: actImgs[i % actImgs.length], name: member.name, seed: member.seed, time: dayAgo };
+  });
+  const visibleGalleryItems = galleryItems.length ? galleryItems : fallbackGalleryItems;
   const myPhotos = verificationHistory.filter(v => v.photo_url && v.status === "completed");
 
   // 포디엄 순서: 2위(좌) - 1위(중앙) - 3위(우)
@@ -240,8 +378,13 @@ export function GroupDetailUI() {
   ].filter(Boolean) as typeof top3;
 
   const startVerification = () => {
-    beginVerification({ verifyType: group.verifyType as VerifyTypeKey });
+    beginVerification({ verifyType: group.verifyType as VerifyTypeKey, groupId: group.dbId ?? null });
     navigate(`/verify/guide/${group.verifyType}`);
+  };
+
+  const handleTabClick = (t: "activity" | "leaderboard" | "gallery") => {
+    setTab(t);
+    tabBarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const handleBack = () => {
@@ -361,8 +504,8 @@ export function GroupDetailUI() {
               </div>
               <div className="w-px h-8 bg-slate-100 shrink-0" />
               <div className="text-right shrink-0">
-                <p className="text-[10px] text-slate-400 font-medium">달성률</p>
-                <p className="text-[18px] font-black text-slate-900 leading-none">{group.rate}%</p>
+                <p className="text-[10px] text-slate-400 font-medium">크루 달성률</p>
+                <p className="text-[18px] font-black leading-none" style={{ color: rateColor(group.rate) }}>{group.rate}%</p>
               </div>
             </div>
             <div className="bg-slate-50 rounded-xl px-3.5 py-3 flex items-center gap-2.5">
@@ -377,22 +520,66 @@ export function GroupDetailUI() {
           </div>
         </section>
 
-        {/* ── 탭 ── */}
-        <div className="mx-4 mt-5 flex gap-1 p-1 bg-white rounded-2xl border border-black/[0.04]"
-          style={{ opacity: mounted ? 1 : 0, transition: "opacity 0.5s ease 0.35s" }}>
-          {(["leaderboard", "activity"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={cn("flex-1 py-2.5 rounded-xl text-[13px] font-black transition-all duration-200 active:scale-[0.97]",
-                tab === t ? "text-white" : "text-slate-400")}
-              style={tab === t ? { background: PG, boxShadow: "0 4px 14px rgba(255,51,85,0.35)" } : {}}>
-              {t === "leaderboard" ? "🏆  순위" : "💬  활동"}
-            </button>
-          ))}
-        </div>
+        {/* ── 챌린지 시작 안내 배너 ── */}
+        {showStartBanner && (
+          <div className="mx-4 mt-4 rounded-2xl overflow-hidden"
+            style={{ background: "linear-gradient(115deg,#FF3355,#FF6680)", boxShadow: "0 4px 16px rgba(255,51,85,0.25)", animation: "noti-drop 0.3s ease both" }}>
+            <div className="px-4 py-4 flex items-start gap-3">
+              <span className="text-2xl mt-0.5 shrink-0">🚀</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-black text-[14px] leading-snug mb-1">챌린지가 시작됐어요!</p>
+                <p className="text-white/80 text-[12px] leading-relaxed">
+                  그룹 챌린지 100%를 달성하기 위해서는 내 달성률이 80% 이상이어야 해요. 내 달성률이 100%라면 특별 보상을 획득할 수 있어요.
+                </p>
+              </div>
+              <button
+                className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-white/20 active:bg-white/30 transition-colors"
+                onClick={() => {
+                  sessionStorage.setItem(`start-banner-${groupId}`, "1");
+                  setShowStartBanner(false);
+                }}>
+                <X className="w-3.5 h-3.5 text-white" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── 저조한 크루 달성률 경고 배너 ── */}
+        {showLowRateAlert && (
+          <div className="mx-4 mt-4 rounded-2xl overflow-hidden bg-red-50 border border-red-100"
+            style={{ animation: "noti-drop 0.3s ease both" }}>
+            <div className="px-4 py-3.5 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-red-600 font-black text-[13px] mb-0.5">크루 달성률이 낮아요 ({group.rate}%)</p>
+                <p className="text-red-500 text-[12px] leading-relaxed">앞으로 매일 인증해야 챌린지를 달성할 수 있어요!</p>
+              </div>
+              <button
+                className="shrink-0 w-6 h-6 flex items-center justify-center"
+                onClick={() => {
+                  sessionStorage.setItem(`low-rate-alert-${groupId}-${new Date().toDateString()}`, "1");
+                  setShowLowRateAlert(false);
+                }}>
+                <X className="w-4 h-4 text-red-300" />
+              </button>
+            </div>
+            <div className="px-4 pb-3">
+              <button
+                className="w-full py-2 rounded-xl bg-red-100 text-red-600 text-[13px] font-bold active:bg-red-200 transition-colors"
+                onClick={() => {
+                  sessionStorage.setItem(`low-rate-alert-${groupId}-${new Date().toDateString()}`, "1");
+                  setShowLowRateAlert(false);
+                  startVerification();
+                }}>
+                지금 인증하기
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── 내 진행 상태 (토글) ── */}
         {group.joined && myRank && (
-          <div className="mx-4 mt-3">
+          <div className="mx-4 mt-4">
             <button
               onClick={() => setShowMyRate(v => !v)}
               className="w-full bg-white rounded-2xl px-4 py-3 flex items-center gap-3 active:bg-slate-50 transition-colors"
@@ -441,8 +628,48 @@ export function GroupDetailUI() {
                 </div>
               </div>
             )}
+
+            {/* ── 베네핏 등급 안내 ── */}
+            <div className="mt-2 bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3"
+              style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+              <div className="w-10 h-10 rounded-xl bg-slate-50 flex flex-col items-center justify-center shrink-0">
+                <span className="text-[16px] font-black" style={{ color: ["#FF3355","#F59E0B","#10B981","#94a3b8"][["A","B","C","D"].indexOf(getBenefitGrade(myRank.rate, group.rate))] }}>
+                  {getBenefitGrade(myRank.rate, group.rate)}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-black text-slate-900">예상 베네핏 등급</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {getBenefitGrade(myRank.rate, group.rate) === "A" && "내 달성률 100% — 특별 보상 3개"}
+                  {getBenefitGrade(myRank.rate, group.rate) === "B" && "내 달성률 80%+ — 보상 2개"}
+                  {getBenefitGrade(myRank.rate, group.rate) === "C" && "내 달성률 50%+ — 보상 1개"}
+                  {getBenefitGrade(myRank.rate, group.rate) === "D" && (group.rate < 50 ? "크루 달성률 부족 (50% 미만)" : "내 달성률 50% 미만")}
+                </p>
+              </div>
+              <div className="text-[10px] text-slate-400 shrink-0">크루 {group.rate}%</div>
+            </div>
           </div>
         )}
+
+        {/* ── 탭 (sticky) ── */}
+        <div ref={tabBarRef} className="sticky top-0 z-20 px-4 pt-4 pb-2 bg-[#F2F2F7]"
+          style={{ opacity: mounted ? 1 : 0, transition: "opacity 0.5s ease 0.35s" }}>
+          <div className="flex gap-1 p-1 bg-white rounded-2xl border border-black/[0.04]"
+            style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+            {([
+              { key: "activity",    label: "💬  활동" },
+              { key: "leaderboard", label: "🏆  순위" },
+              { key: "gallery",     label: "📸  갤러리" },
+            ] as const).map(({ key: t, label }) => (
+              <button key={t} onClick={() => handleTabClick(t)}
+                className={cn("flex-1 py-2.5 rounded-xl text-[12px] font-black transition-all duration-200 active:scale-[0.97]",
+                  tab === t ? "text-white" : "text-slate-400")}
+                style={tab === t ? { background: PG, boxShadow: "0 4px 14px rgba(255,51,85,0.35)" } : {}}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* ── 탭 컨텐츠 ── */}
         <div className="pb-6">
@@ -624,29 +851,33 @@ export function GroupDetailUI() {
               </div>
             </div>
 
-          ) : (
+          ) : tab === "activity" ? (
             /* ── 활동 피드 ── */
             <div className="px-4 mt-3">
-              {detail.activity.length > 0 ? (
+              {activityItems.length > 0 ? (
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="flex flex-col gap-2.5">
-                    {detail.activity.filter((_, i) => i % 2 === 0).map((item, i) => {
-                      const imgSrc = item.type === "verify" ? (actImgs[i * 2] ?? actImgs[0]) : undefined;
+                    {activityItems.filter((_, i) => i % 2 === 0).map((item, i) => {
+                      const imgSrc = item.photoUrl ?? (item.type === "verify" ? (actImgs[i * 2] ?? actImgs[0]) : undefined);
                       return (
-                        <ActivityCard key={i} item={item} imgSrc={imgSrc}
+                        <ActivityCard key={item.id ?? i} item={item} imgSrc={imgSrc}
                           aspect={i === 0 ? "tall" : "square"} mounted={mounted} delay={i * 80} groupId={groupId} />
                       );
                     })}
                   </div>
                   <div className="flex flex-col gap-2.5 mt-6">
-                    {detail.activity.filter((_, i) => i % 2 === 1).map((item, i) => {
-                      const imgSrc = item.type === "verify" ? (actImgs[i * 2 + 1] ?? actImgs[1]) : undefined;
+                    {activityItems.filter((_, i) => i % 2 === 1).map((item, i) => {
+                      const imgSrc = item.photoUrl ?? (item.type === "verify" ? (actImgs[i * 2 + 1] ?? actImgs[1]) : undefined);
                       return (
-                        <ActivityCard key={i} item={item} imgSrc={imgSrc}
+                        <ActivityCard key={item.id ?? i} item={item} imgSrc={imgSrc}
                           aspect={i === 0 ? "square" : "tall"} mounted={mounted} delay={i * 80 + 40} groupId={groupId} />
                       );
                     })}
                   </div>
+                </div>
+              ) : activityLoading ? (
+                <div className="bg-white rounded-2xl px-5 py-8 text-center border border-black/[0.04]">
+                  <p className="text-[13px] font-bold text-slate-400">활동을 불러오는 중이에요</p>
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl px-5 py-8 text-center border border-black/[0.04]">
@@ -657,6 +888,34 @@ export function GroupDetailUI() {
                   <p className="text-[12px] text-slate-400 mt-1 leading-relaxed">첫 인증을 남기면 이곳에 기록돼요.</p>
                 </div>
               )}
+            </div>
+
+          ) : (
+            /* ── 그룹 갤러리 ── */
+            <div className="px-4 mt-3">
+              {/* 헤더 */}
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[12px] font-black text-slate-400">
+                  총 <span className="text-[#FF3355]">{visibleGalleryItems.length}</span>개의 인증 사진
+                </p>
+                <span className="text-[11px] text-slate-400">{group.members}명 참여 중</span>
+              </div>
+
+              {/* 3열 그리드 */}
+              <div className="grid grid-cols-3 gap-1">
+                {visibleGalleryItems.map((item, i) => (
+                  <button key={i} onClick={() => setLightbox(item)}
+                    className="relative aspect-square rounded-xl overflow-hidden active:opacity-80 transition-opacity"
+                    style={{ opacity: mounted ? 1 : 0, transition: `opacity 0.35s ease ${i * 30}ms` }}>
+                    <img src={item.url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    {/* 바텀 그라데이션 + 아바타 */}
+                    <div className="absolute inset-x-0 bottom-0 h-10 pointer-events-none"
+                      style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55), transparent)" }} />
+                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`} alt=""
+                      className="absolute bottom-1.5 left-1.5 w-5 h-5 rounded-full bg-white border border-white/60" />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -681,6 +940,35 @@ export function GroupDetailUI() {
           </button>
         )}
       </div>
+
+      {/* ── 갤러리 라이트박스 ── */}
+      {lightbox && (
+        <div className="absolute inset-0 z-50 flex flex-col"
+          style={{ background: "rgba(0,0,0,0.92)", animation: "fade-in 0.18s ease both" }}
+          onClick={() => setLightbox(null)}>
+          {/* 닫기 */}
+          <div className="flex items-center justify-between px-4 pt-5 pb-3 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${lightbox.seed}`} alt=""
+                className="w-9 h-9 rounded-full bg-white/10 border border-white/20" />
+              <div>
+                <p className="text-white font-black text-[13px] leading-none">{lightbox.name}</p>
+                <p className="text-white/45 text-[11px] mt-0.5">{lightbox.time}</p>
+              </div>
+            </div>
+            <button onClick={() => setLightbox(null)}
+              className="w-9 h-9 rounded-full flex items-center justify-center active:opacity-60"
+              style={{ background: "rgba(255,255,255,0.12)" }}>
+              <X className="w-4 h-4 text-white" />
+            </button>
+          </div>
+          {/* 사진 */}
+          <div className="flex-1 flex items-center justify-center px-4 pb-8" onClick={e => e.stopPropagation()}>
+            <img src={lightbox.url} alt="" className="w-full max-h-full object-contain rounded-2xl"
+              style={{ boxShadow: "0 16px 48px rgba(0,0,0,0.5)" }} referrerPolicy="no-referrer" />
+          </div>
+        </div>
+      )}
 
       {/* ── 액션 메뉴 ── */}
       {showActionMenu && (
@@ -769,6 +1057,49 @@ export function GroupDetailUI() {
         </div>
       )}
 
+      {/* ── 72시간 미인증 탈퇴 여부 팝업 ── */}
+      {showLeave72h && (
+        <div className="absolute inset-0 z-50 flex items-end"
+          style={{ background: "rgba(0,0,0,0.5)", animation: "fade-in 0.2s ease both" }}>
+          <div className="w-full bg-white rounded-t-3xl p-6"
+            style={{ animation: "sheet-up 0.35s cubic-bezier(0.4,0,0.2,1) both" }}>
+            <div className="w-10 h-1 rounded-full bg-slate-200 mx-auto mb-5" />
+            <div className="text-center mb-5">
+              <span className="text-[40px]">😥</span>
+              <h3 className="text-[18px] font-black text-slate-900 mt-2">챌린지에 참여하고 있나요?</h3>
+              <p className="text-[13px] text-slate-400 mt-2 leading-relaxed">
+                72시간 동안 인증이 없었어요.<br />계속 참여하시겠어요?
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const lastVerif = verificationHistory.filter(v => v.group_id === groupDbId && v.status === "completed")[0];
+                  if (lastVerif) sessionStorage.setItem(`leave72-${groupId}-${lastVerif.id}`, "1");
+                  setShowLeave72h(false);
+                  leaveGroup(groupId);
+                  navigate("/challenge");
+                }}
+                className="flex-1 h-12 rounded-2xl bg-slate-100 text-slate-500 font-bold text-[14px]">
+                탈퇴
+              </button>
+              <button
+                onClick={() => {
+                  const lastVerif = verificationHistory.filter(v => v.group_id === groupDbId && v.status === "completed")[0];
+                  if (lastVerif) sessionStorage.setItem(`leave72-${groupId}-${lastVerif.id}`, "1");
+                  setShowLeave72h(false);
+                  startVerification();
+                }}
+                className="flex-[2] h-12 rounded-2xl text-white font-black text-[14px] active:scale-95 transition-all"
+                style={{ background: PG, boxShadow: "0 8px 20px -4px rgba(255,51,85,0.5)" }}>
+                지금 인증하기
+              </button>
+            </div>
+            <div className="pb-2" />
+          </div>
+        </div>
+      )}
+
       {/* ── 탈퇴 확인 시트 ── */}
       {showLeaveConfirm && (
         <div className="absolute inset-0 z-50 flex items-end" onClick={() => setShowLeaveConfirm(false)}
@@ -821,7 +1152,19 @@ function ActivityCard({
         transition: `opacity 0.4s ease ${delay}ms, transform 0.4s ease ${delay}ms`,
       }}
       onClick={() => navigate(`/challenge/group/${groupId}/activity`, {
-        state: { imgSrc, grad: item.grad, name: item.name, seed: item.seed, time: item.time, msg: item.msg, type: item.type },
+        state: {
+          postId: item.id,
+          userId: item.userId,
+          imgSrc,
+          grad: item.grad,
+          name: item.name,
+          seed: item.seed,
+          time: item.time,
+          msg: item.msg,
+          type: item.type,
+          reactionCount: item.reactionCount,
+          myReaction: item.myReaction,
+        },
       })}
     >
       <div className={`relative ${aspect === "tall" ? "aspect-[3/4]" : "aspect-square"}`}>
@@ -838,7 +1181,7 @@ function ActivityCard({
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <button
             className="flex items-center gap-1.5 mb-1 w-full active:opacity-70 transition-opacity"
-            onClick={e => { e.stopPropagation(); navigate(`/user/${item.seed}`); }}
+            onClick={e => { e.stopPropagation(); navigate(`/user/${item.userId ?? item.seed}`); }}
           >
             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`}
               className="w-5 h-5 rounded-full bg-white/20 shrink-0" />

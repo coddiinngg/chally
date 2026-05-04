@@ -50,6 +50,7 @@ function mergeSignals(signals: AbortSignal[]): AbortController {
 export async function verifyPhotoWithAI(
   file: File,
   key: VerifyTypeKey,
+  groupId?: string | null,
   externalSignal?: AbortSignal,
 ): Promise<VerifyResult> {
   if (file.type && !file.type.startsWith("image/")) {
@@ -78,7 +79,7 @@ export async function verifyPhotoWithAI(
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ image: base64, verifyType: key }),
+        body: JSON.stringify({ image: base64, verifyType: key, groupId: groupId ?? null }),
         signal: combined.signal,
       },
     );

@@ -1,281 +1,190 @@
-# Chally 작업 계획
+# Chally TODO
 
-| 기능 | 상태 | Phase |
-|------|------|-------|
-| 그룹 목록 | ❌ mock | 1 |
-| 그룹 참여/탈퇴 | ❌ mock | 1 |
-| 그룹 생성 | ❌ DB 없음 | 1 |
-| 리더보드 | ❌ mock | 1 |
-| 홈 순위 슬라이드 | ❌ mock | 1 |
-| 실시간 인증 피드 | ❌ mock | 1 |
-| 그룹 채팅 | ❌ mock | 2 |
-| 알림 설정 저장 | ❌ 저장 안 됨 | 2 |
-| 통계 달력 월 이동 | ✅ 완료 | 3 |
-| 챌린지 건의함 | ❌ mock | 3 |
-| 친구 초대 | ❌ mock | 3 |
-| 프로필 달성 회수 | ✅ 완료 | 3 |
-
----
-
-> 이 파일은 Claude가 실제 구현 작업 시 참조하는 실행 계획서입니다.
-> 각 태스크는 원자적(atomic)으로 작성되어 있으며, 의존 관계 순서대로 나열됩니다.
-
----
+실제 모바일 런칭을 목표로 한 작업 현황입니다.  
+완료 여부는 코드와 Supabase 마이그레이션 기준으로 관리합니다.
 
 ## 상태 표기
-- `[ ]` 미시작
-- `[~]` 진행 중
+
 - `[x]` 완료
+- `[~]` 진행 중 / 부분 연결
+- `[ ]` 미시작
 
----
+## 현재 연결 상태
 
-## Phase 1 — 소셜 기능 기반
+| 영역 | 상태 | 저장 위치 / 기준 |
+|------|------|------------------|
+| 로그인/회원가입 | [x] | Supabase Auth, `profiles` |
+| 추천코드 회원가입 보상 | [x] | `profiles.invite_code`, `referrals`, `xp_total` |
+| 그룹 목록 로드 | [x] | `groups` + `legacy_id` 매핑 |
+| 그룹 참여/탈퇴 | [x] | `group_members` insert/delete |
+| 그룹 참여 상태 유지 | [x] | 재로그인 시 `group_members` 조회 |
+| 인증 사진 AI 판정 | [x] | Supabase Edge Function `verify-photo` |
+| 인증 성공 기록 | [x] | `verifications`, Storage `verifications` |
+| 인증의 그룹/타입 저장 | [x] | `verifications.group_id`, `verifications.verify_type` |
+| 인증 성공 활동글 생성 | [x] | Edge Function → `activity_posts` |
+| 갤러리/통계/리워드 인증 기반 표시 | [x] | `verificationHistory` / `verifications` |
+| 프로필 이미지 업로드 | [x] | Storage `avatars`, `profiles.avatar_url` |
+| 알림 목록 읽기/처리 | [x] | `notifications` |
+| 알림 설정 저장 | [x] | `notification_settings` |
+| 챌린지 건의/응원/댓글/알림받기 | [x] | `challenge_suggestions` 계열 테이블 |
+| 친구 초대 코드/공유/초대 기록 | [x] | `friend_invites`, `invite_events`, `referrals` |
+| 그룹 생성 페이지 | [x] 삭제 | 런칭 범위 제외 |
+| 소셜 로그인 버튼 | [~] 배치만 유지 | provider 연결 미완 |
+| 활동 사진 리액션/좋아요 | [x] | `activity_reactions` |
+| 실제 활동 피드 | [~] 부분 연결 | 그룹 상세/전체 피드 DB 우선, 일부 홈/상세 fallback mock 잔존 |
+| 그룹 랭킹/홈 순위 | [x] | `get_group_leaderboard` RPC |
+| 그룹 채팅 | [ ] | 현재 mock |
 
-> 전제: Phase 1 DB 작업은 Supabase SQL Editor에서 먼저 실행해야 코드 작업이 가능합니다.
+## 완료된 주요 작업
 
-### DB 작업 (schema.sql 반영 후 Supabase에서 실행)
+### 1차
 
-- [ ] **P1-DB-1** `supabase/schema.sql`
-  - `group_leaderboard` 뷰 추가
-  - 목적: 그룹별 멤버 달성률 실시간 집계 (GroupDetail 리더보드, 홈 순위 슬라이드 공통 사용)
-  ```sql
-  CREATE OR REPLACE VIEW group_leaderboard AS
-  SELECT
-    gm.group_id,
-    gm.user_id,
-    p.username,
-    p.avatar_url,
-    COUNT(v.id) FILTER (WHERE v.status = 'completed') AS total_done,
-    ROUND(
-      COUNT(v.id) FILTER (WHERE v.status = 'completed')::numeric
-      / NULLIF(DATE_PART('day', NOW() - gm.joined_at) + 1, 0) * 100
-    ) AS rate
-  FROM group_members gm
-  JOIN profiles p ON p.id = gm.user_id
-  LEFT JOIN verifications v ON v.user_id = gm.user_id
-  GROUP BY gm.group_id, gm.user_id, p.username, p.avatar_url, gm.joined_at;
-  ```
+- [x] 그룹 생성 페이지 제거
+- [x] 공유 유틸 추가: `src/lib/share.ts`
+- [x] 성공/친구초대/챌린지건의 공유 버튼 연결
+- [x] 프로필 이미지 업로드를 Supabase Storage `avatars`에 연결
+- [x] 알림 설정을 `notification_settings` 테이블에 저장
+- [x] 알림 수락/거절 상태 처리
+- [x] 마이그레이션 적용
+  - `20260503000000_notification_settings.sql`
+  - `20260503001000_avatar_storage.sql`
 
-- [ ] **P1-DB-2** `supabase/schema.sql`
-  - `profiles` 공개 읽기 RLS 정책 추가
-  - 목적: 피드에서 다른 유저의 username/avatar_url 조회 가능하도록
-  ```sql
-  DROP POLICY IF EXISTS "profiles_select" ON profiles;
-  CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (true);
-  CREATE POLICY "profiles_update_own" ON profiles FOR UPDATE USING (auth.uid() = id);
-  CREATE POLICY "profiles_insert_own" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
-  ```
+### 2차
 
-- [ ] **P1-DB-3** `supabase/schema.sql`
-  - 그룹 시드 데이터 INSERT (현재 하드코딩된 6개 그룹)
-  - 주의: 이미 존재하면 중복 삽입 방지를 위해 `ON CONFLICT DO NOTHING` 사용
-  ```sql
-  INSERT INTO groups (name, description, category, max_members, is_public) VALUES
-    ('매일 5,000보 걷기', '걸음 수 인증으로 함께 건강해져요', '운동', 50, true),
-    ('러닝 크루', '러닝하며 최애 풍경을 함께 공유해요', '운동', 50, true),
-    ('일일 독서 클럽', '매일 읽는 책 표지를 함께 모아요', '학습', 50, true),
-    ('필사 챌린지', '곱씹게 되는 문장을 함께 모아요', '학습', 50, true),
-    ('포즈 챌린지', '오늘의 지정 포즈에 도전해요', '생활', 50, true),
-    ('장소 탐험대', '목표 장소에서 인증샷을 찍어요', '생활', 50, true)
-  ON CONFLICT DO NOTHING;
-  ```
+- [x] 챌린지 건의함 DB 연결
+- [x] 건의 작성, 응원, 댓글, 알림받기 저장
+- [x] 투표/댓글 카운트 트리거 추가
+- [x] 기본 건의 데이터 seed
+- [x] 마이그레이션 적용
+  - `20260503002000_challenge_suggestions.sql`
 
----
+### 3차
 
-### 코드 작업
+- [x] 추천코드 기반 친구 초대 연결
+- [x] 회원가입 시 `ref` 처리 및 XP 보상
+- [x] 초대 링크 복사/공유/문자/추천 친구 초대 이벤트 저장
+- [x] 마이그레이션 적용
+  - `20260503003000_referrals.sql`
+  - `20260503003100_invite_events.sql`
 
-- [ ] **P1-1** `src/contexts/AppContext.tsx`
-  - `DEFAULT_GROUPS` 상수 제거
-  - `loadGroups()` 함수 추가: `groups` 테이블 + `group_members` JOIN으로 목록 조회 및 `joined` 판단
-  - `useEffect([user?.id])` 에서 `loadGroups()` 호출
-  - `groups` 초기값 `[]`로 변경
-  - 의존: P1-DB-3 완료 후
+### 4차
 
-- [ ] **P1-2** `src/contexts/AppContext.tsx`
-  - `joinGroup(id)` 함수: 낙관적 업데이트 → `group_members` INSERT → 실패 시 롤백
-  - `leaveGroup(id)` 함수: 낙관적 업데이트 → `group_members` DELETE → 실패 시 롤백
-  - 의존: P1-1
+- [x] 앱의 기존 그룹 ID `"1"~"6"`을 DB `groups.id` UUID와 `legacy_id`로 매핑
+- [x] 그룹 목록을 Supabase `groups`에서 로드
+- [x] 그룹 참여/탈퇴를 `group_members`에 저장
+- [x] 가입/탈퇴 시 `groups.member_count` 자동 증감
+- [x] 재로그인 후 가입 그룹 조회 RLS 수정
+- [x] 마이그레이션 적용
+  - `20260503004000_group_members_app_mapping.sql`
+  - `20260503004100_fix_group_members_select_policy.sql`
 
-- [ ] **P1-3** `src/pages/challenge/CreateGroup.tsx`
-  - `handleCreate`: `setTimeout` 제거, `groups` INSERT → `group_members` INSERT (role: 'admin') → done 처리
-  - 의존: P1-2
+### 5차
 
-- [ ] **P1-4** `src/pages/challenge/GroupDetail.tsx`
-  - `GROUPS_DETAIL` 상수 제거
-  - 컴포넌트 마운트 시 `group_leaderboard` 뷰 조회 → leaderboard state 설정
-  - 활동 피드: `verifications` JOIN `profiles` 조회로 대체
-  - 의존: P1-DB-1, P1-DB-2
+- [x] `verifications`에 `group_id`, `verify_type` 추가
+- [x] `activity_posts` 테이블 추가
+- [x] `activity_reactions` 테이블 추가
+- [x] 인증 요청에 그룹 UUID 전달
+- [x] Edge Function `verify-photo`에서 멤버십 확인 후 인증 저장
+- [x] 인증 성공 시 `activity_posts` 자동 생성
+- [x] 그룹 상세 활동 탭을 `activity_posts` 기반으로 우선 로드
+- [x] 전체 피드를 `activity_posts` 기반으로 로드
+- [x] 홈 실시간 인증 피드를 `activity_posts` 기반으로 우선 로드
+- [x] 활동 사진 리액션을 `activity_reactions`에 저장
+- [x] Edge Function 원격 배포 완료
+- [x] 마이그레이션 적용
+  - `20260504000000_activity_posts_reactions.sql`
 
-- [ ] **P1-5** `src/pages/Home.tsx`
-  - `GROUP_RANKERS` 상수 제거
-  - `selectedGroupId` 변경 시 `group_leaderboard` 뷰 조회 → rankers state 설정
-  - 의존: P1-DB-1
+### 6차
 
-- [ ] **P1-6** `src/pages/Home.tsx` + `src/pages/FeedAll.tsx`
-  - `FEED_ITEMS` / `ALL_FEED_ITEMS` 상수 제거
-  - `verifications` 테이블에서 `photo_url IS NOT NULL` + `status = 'completed'` 조건으로 최신 20건 조회
-  - JOIN: `profiles(username, avatar_url)`
-  - 의존: P1-DB-2
+- [x] 그룹별 리더보드 RPC 추가
+- [x] 홈 순위 슬라이드를 DB 리더보드 우선 로드로 연결
+- [x] 그룹 상세 순위 탭을 DB 리더보드 우선 로드로 연결
+- [x] DB 데이터가 없을 때 기존 mock 랭킹 fallback 유지
+- [x] 마이그레이션 적용
+  - `20260504001000_challenge_lifecycle.sql`
+  - `20260504002000_group_leaderboard_rpc.sql`
 
----
+## 완료된 주요 작업 (계속)
 
-## Phase 2 — 채팅 + 알림 설정
+### 7차
 
-### DB 작업
+- [x] 챌린지 인증 공유 카드 UI — `src/pages/verify/ShareCard.tsx`
+  - 사진 탭 → 전체화면 공유 카드 (다크/라이트 토글, 제목 인라인 편집, @유저명)
+  - Canvas API로 카드 이미지 합성 후 4-앱 바텀시트 공유 (인스타·카카오·X·더보기)
+  - `Success.tsx` 사진 영역에서 탭 시 오버레이로 진입
+- [x] 크루 챌린지 달성 UI — `src/pages/challenge/ChallengeResult.tsx`
+  - `/challenge/group/:groupId/result` 라우트 추가
+  - 달성(≥50%)/미달성 분기, 베네핏 등급 카드, 내 기록 (get_group_leaderboard RPC 실연동)
+  - Home 그룹현황 슬라이드: `challengeEnd < now` 감지 → 결과 카드로 전환
 
-- [ ] **P2-DB-1** `supabase/schema.sql`
-  - `group_messages` 테이블 + RLS 정책 추가
-  ```sql
-  CREATE TABLE IF NOT EXISTS group_messages (
-    id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    group_id   UUID REFERENCES groups(id) ON DELETE CASCADE NOT NULL,
-    user_id    UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    body       TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-  );
-  CREATE INDEX IF NOT EXISTS group_messages_group_created
-    ON group_messages (group_id, created_at DESC);
-  ALTER TABLE group_messages ENABLE ROW LEVEL SECURITY;
-  -- 같은 그룹 멤버만 읽기/쓰기 가능
-  CREATE POLICY "group_messages_select" ON group_messages FOR SELECT USING (
-    EXISTS (SELECT 1 FROM group_members WHERE group_id = group_messages.group_id AND user_id = auth.uid())
-  );
-  CREATE POLICY "group_messages_insert" ON group_messages FOR INSERT WITH CHECK (
-    auth.uid() = user_id AND
-    EXISTS (SELECT 1 FROM group_members WHERE group_id = group_messages.group_id AND user_id = auth.uid())
-  );
-  ```
+## 다음 우선순위
 
-- [ ] **P2-DB-2** `supabase/schema.sql`
-  - `profiles` 테이블에 알림 설정 컬럼 추가
-  ```sql
-  ALTER TABLE profiles
-    ADD COLUMN IF NOT EXISTS notif_daily       BOOLEAN DEFAULT true,
-    ADD COLUMN IF NOT EXISTS notif_challenge   BOOLEAN DEFAULT true,
-    ADD COLUMN IF NOT EXISTS notif_weekly      BOOLEAN DEFAULT true,
-    ADD COLUMN IF NOT EXISTS notif_achievement BOOLEAN DEFAULT true,
-    ADD COLUMN IF NOT EXISTS notif_time        TIME DEFAULT '07:00';
-  ```
+### P0 — 그룹 참여 유지 검증
 
----
+- [ ] 실제 계정으로 모바일 흐름 재검증
+  - 로그인
+  - 그룹 참여
+  - 앱 새로고침
+  - 로그아웃
+  - 재로그인
+  - 참여 상태 유지 확인
+- [ ] 브라우저 콘솔에서 `Failed to load group memberships` 로그가 없는지 확인
+- [ ] Supabase `group_members` row가 생성되는지 확인
 
-### 코드 작업
+### P1 — 홈/그룹 상세 mock 제거
 
-- [ ] **P2-1** `src/pages/Home.tsx` (채팅 슬라이드)
-  - `GROUP_CHATS` 상수 제거
-  - 마운트 시 `group_messages` 최근 50건 조회
-  - Supabase Realtime `postgres_changes` 구독 → 새 메시지 자동 append
-  - `sendChat`: `group_messages` INSERT
-  - 언마운트 시 `supabase.removeChannel()` cleanup
-  - 의존: P2-DB-1, P1-2 (그룹 참여 여부 확인)
+- [ ] 그룹 상세 활동 피드 fallback mock 제거 여부 결정
+- [ ] 홈 활동/피드 fallback mock 제거 여부 결정
+- [ ] `verifications` / `activity_posts` / `profiles` 기반으로 최신 활동 표시
+- [ ] 실제 이미지가 없을 때 fallback UI 정리
 
-- [ ] **P2-2** `src/types/database.ts`
-  - `Profile` 타입에 알림 설정 컬럼 추가
-  - `notif_daily`, `notif_challenge`, `notif_weekly`, `notif_achievement`, `notif_time`
-  - 의존: P2-DB-2
+### P2 — 그룹 채팅
 
-- [ ] **P2-3** `src/pages/NotificationSettings.tsx`
-  - 마운트 시 `AuthContext`의 `profile`에서 알림 설정값 읽어와 state 초기화
-  - 토글/시간 변경 시 500ms debounce 후 `profiles` UPDATE
-  - 의존: P2-2
+- [ ] `group_messages` 테이블 추가
+- [ ] 같은 그룹 멤버만 읽기/쓰기 가능한 RLS 추가
+- [ ] 홈 채팅 슬라이드 DB 연결
+- [ ] Supabase Realtime 구독
 
----
+### P3 — 소셜 로그인 실제 연결
 
-## Phase 3 — 나머지 기능
+- [ ] Supabase provider 설정 확인
+- [ ] Google OAuth 연결
+- [ ] Apple OAuth 연결 여부 결정
+- [ ] 소셜 로그인 후 프로필 생성/추천코드 동작 확인
 
-### DB 작업
+### P4 — 온보딩/프로필 보강
 
-- [ ] **P3-DB-1** `supabase/schema.sql`
-  - `suggestions` + `suggestion_votes` 테이블 추가 (건의함)
-  ```sql
-  CREATE TABLE IF NOT EXISTS suggestions (
-    id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    title             TEXT NOT NULL,
-    description       TEXT,
-    category          TEXT,
-    duration          TEXT,
-    verify_method     TEXT,
-    status            TEXT DEFAULT 'voting' CHECK (status IN ('voting','confirmed','reviewing')),
-    votes             INT DEFAULT 0,
-    operator_comment  TEXT,
-    created_at        TIMESTAMPTZ DEFAULT NOW()
-  );
-  CREATE TABLE IF NOT EXISTS suggestion_votes (
-    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    suggestion_id UUID REFERENCES suggestions(id) ON DELETE CASCADE,
-    user_id       UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    UNIQUE (suggestion_id, user_id)
-  );
-  ALTER TABLE suggestions      ENABLE ROW LEVEL SECURITY;
-  ALTER TABLE suggestion_votes ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "suggestions_select"       ON suggestions FOR SELECT USING (true);
-  CREATE POLICY "suggestions_insert"       ON suggestions FOR INSERT WITH CHECK (auth.uid() = user_id);
-  CREATE POLICY "suggestion_votes_select"  ON suggestion_votes FOR SELECT USING (true);
-  CREATE POLICY "suggestion_votes_insert"  ON suggestion_votes FOR INSERT WITH CHECK (auth.uid() = user_id);
-  CREATE POLICY "suggestion_votes_delete"  ON suggestion_votes FOR DELETE  USING (auth.uid() = user_id);
-  ```
+- [ ] 온보딩 닉네임을 `profiles.username`에 저장
+- [ ] `/user/:seed`를 실제 `profiles.id` 기반 라우팅으로 정리
+- [ ] 친구 추천 목록을 실제 유저 검색/추천으로 전환
 
-- [ ] **P3-DB-2** `supabase/schema.sql`
-  - `profiles.invite_code` 컬럼 추가 + `handle_new_user` 트리거 수정
-  ```sql
-  ALTER TABLE profiles ADD COLUMN IF NOT EXISTS invite_code TEXT UNIQUE;
-  -- 기존 유저 코드 일괄 생성
-  UPDATE profiles SET invite_code = upper(substring(md5(id::text), 1, 8))
-  WHERE invite_code IS NULL;
-  -- 신규 가입 트리거에 invite_code 포함 (handle_new_user 함수 수정)
-  ```
+### P5 — 모바일 런칭 점검
 
----
+- [ ] iOS Safari 카메라/파일 업로드 확인
+- [ ] Android Chrome 카메라/파일 업로드 확인
+- [ ] safe-area inset 확인
+- [ ] 하단 네비 터치 영역 확인
+- [ ] 큰 번들 경고 개선 검토
+- [ ] 에러/로딩/빈 상태 화면 정리
 
-### 코드 작업
+## 검증 명령어
 
-- [x] **P3-1** `src/pages/Stats.tsx` — codex
-  - `calOffset` state 추가 (0 = 이번 달)
-  - `CAL_YEAR`, `CAL_MONTH`, `CAL_TODAY`를 `calOffset` 기반으로 동적 계산
-  - `ChevronLeft` onClick: `setCalOffset(o => o - 1)`
-  - `ChevronRight` onClick: `setCalOffset(o => Math.min(0, o + 1))`, `calOffset === 0`이면 disabled
-  - 의존: 없음 (독립)
+```bash
+npm run lint
+npm run build
+supabase migration list
+```
 
-- [ ] **P3-2** `src/pages/ChallengeRequest.tsx`
-  - `SUGGESTIONS` 상수 제거
-  - 마운트 시 `suggestions` + `suggestion_votes` 조회 (내가 투표했는지 포함)
-  - 투표 토글: `suggestion_votes` INSERT/DELETE + `suggestions.votes` 낙관적 업데이트
-  - 새 건의 제출: `suggestions` INSERT
-  - 의존: P3-DB-1
+## 원격 DB 적용 완료 마이그레이션
 
-- [ ] **P3-3** `src/pages/FriendInvite.tsx`
-  - 검색 입력 시 `profiles` ilike 검색 (2글자 이상)
-  - `SUGGESTED` 하드코딩 제거
-  - `INVITE_CODE` / `INVITE_URL` 하드코딩 제거 → `profile.invite_code` 사용
-  - 공유 버튼: `navigator.share()` → fallback `navigator.clipboard.writeText()`
-  - 의존: P3-DB-2
-
-- [x] **P3-4** `src/pages/Profile.tsx` — 완료 — codex
-  - `totalDone`: verificationHistory 기반으로 수정
-  - `maxStreak`: profile.streak_count 사용
-  - `성공률`: 최근 30일 인증 일수 기반으로 계산
-  - 의존: 없음 (독립)
-
----
-
-## 빠른 버그픽스 (언제든 독립 처리 가능)
-
-- [x] **BUG-1** `src/pages/Profile.tsx:53` — 달성 회수 계산 오류 — codex
-- [x] **BUG-2** `src/pages/Stats.tsx` — 통계 헤더 `Calendar` 버튼 빈 onClick 제거 또는 달력 스크롤로 연결 — codex
-
----
-
-## UI/UX 개선
-
-- [x] **UX-1** `src/pages/challenge/GroupDetail.tsx` — 그룹 상세 1차 UI 구조 정리 (히어로 축소, 컴팩트 바 단순화, 우상단 액션 메뉴, 참여 상태별 카드, 활동 빈 상태) — codex
-
----
-
-## 작업 전 체크사항
-
-작업 시작 전 항상 확인:
-1. DB 작업(`*-DB-*`)은 코드 작업 전에 Supabase에서 먼저 실행
-2. `supabase/schema.sql`에도 동일하게 반영해 형상관리 유지
-3. RLS 정책 변경 시 기존 정책 DROP 후 재생성 (중복 방지)
-4. Realtime 구독은 반드시 컴포넌트 unmount 시 `removeChannel()` cleanup
+- `20260501145701_remote_schema.sql`
+- `20260503000000_notification_settings.sql`
+- `20260503001000_avatar_storage.sql`
+- `20260503002000_challenge_suggestions.sql`
+- `20260503003000_referrals.sql`
+- `20260503003100_invite_events.sql`
+- `20260503004000_group_members_app_mapping.sql`
+- `20260503004100_fix_group_members_select_policy.sql`
+- `20260504000000_activity_posts_reactions.sql`
+- `20260504001000_challenge_lifecycle.sql`
+- `20260504002000_group_leaderboard_rpc.sql`

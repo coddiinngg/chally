@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Bell, BellRing, Camera, Flame, Send, Crown, ChevronRight, Zap, Lightbulb, SmilePlus } from "lucide-react";
+import { Bell, BellRing, Camera, Flame, Send, Crown, ChevronRight, Zap, Lightbulb, SmilePlus, Trophy, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
+import { useAuth } from "../contexts/AuthContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../lib/verifyTypes";
 import { useGuestGuard } from "../contexts/GuestGuardContext";
+import { formatActivityTime, loadActivityFeed, type ActivityFeedItem } from "../lib/activity";
+import { loadGroupLeaderboard, type LeaderboardItem } from "../lib/leaderboard";
+import { getBenefitGrade } from "../lib/challengeUtils";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 const rateColor = (r: number) => r >= 80 ? "#10B981" : r >= 50 ? "#F59E0B" : "#FF3355";
@@ -94,6 +98,7 @@ let lastAnimatedGroupId: string | null = null;
 
 interface FeedItem {
   id: string;
+  postId?: string;
   user: string;
   seed: string;
   time: string;
@@ -102,6 +107,8 @@ interface FeedItem {
   verifyEmoji: string;
   img: string;
   aspect: "tall" | "square";
+  reactionCount?: number;
+  myReaction?: string | null;
 }
 
 const FEED_ITEMS: FeedItem[] = [
@@ -146,6 +153,7 @@ const FEED_ITEMS: FeedItem[] = [
 export function Home() {
   const navigate = useNavigate();
   const { nickname, beginVerification, groups, selectedGroupId, setSelectedGroupId, notifications } = useApp();
+  const { user } = useAuth();
   const myGroups = groups.filter(g => g.joined);
   const [slideIdx, setSlideIdx]               = useState(0);
   const [chats, setChats]                     = useState<ChatMsg[]>([]);
@@ -156,6 +164,8 @@ export function Home() {
   const { guardAction } = useGuestGuard();
   const [reactions, setReactions]           = useState<Record<string, string>>({});
   const [emojiPickerFor, setEmojiPickerFor] = useState<string | null>(null);
+  const [activityFeed, setActivityFeed] = useState<ActivityFeedItem[]>([]);
+  const [leaderboardRows, setLeaderboardRows] = useState<LeaderboardItem[]>([]);
 
   const chatEndRef      = useRef<HTMLDivElement>(null);
   const chatScrollRef   = useRef<HTMLDivElement>(null);
@@ -181,6 +191,21 @@ export function Home() {
       if (animFrameRef.current)   cancelAnimationFrame(animFrameRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadHomeFeed() {
+      try {
+        const posts = await loadActivityFeed({ userId: user?.id ?? null, limit: 12 });
+        if (!cancelled) setActivityFeed(posts);
+      } catch (error) {
+        console.error("Failed to load home activity feed", error);
+        if (!cancelled) setActivityFeed([]);
+      }
+    }
+    void loadHomeFeed();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   // 앱 시작·그룹 변경 시 퍼센트 카운트업 — DOM 직접 조작으로 re-render 없이 60fps
   const groupRate = (myGroups.find(g => g.id === selectedGroupId) ?? myGroups[0])?.rate ?? 0;
@@ -238,14 +263,63 @@ export function Home() {
   }, [myGroups.length, selectedGroupId]);
 
   const selectedGroup = myGroups.find(g => g.id === selectedGroupId) ?? myGroups[0];
-  const rankers       = GROUP_RANKERS[selectedGroupId] ?? GROUP_RANKERS["1"];
+  const isChallengeEnded = !!(
+    selectedGroup?.challengeEnd &&
+    new Date(selectedGroup.challengeEnd) < new Date()
+  );
+  const rankers       = leaderboardRows.length
+    ? leaderboardRows.map(row => ({
+      rank: row.rank,
+      name: row.name,
+      streak: row.streak,
+      rate: row.rate,
+      seed: row.userId,
+      isMe: row.isMe,
+    }))
+    : (GROUP_RANKERS[selectedGroupId] ?? GROUP_RANKERS["1"]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRanking() {
+      if (!selectedGroup?.dbId) {
+        setLeaderboardRows([]);
+        return;
+      }
+      try {
+        const rows = await loadGroupLeaderboard(selectedGroup.dbId, 10);
+        if (!cancelled) setLeaderboardRows(rows);
+      } catch (error) {
+        console.error("Failed to load home leaderboard", error);
+        if (!cancelled) setLeaderboardRows([]);
+      }
+    }
+    void loadRanking();
+    return () => { cancelled = true; };
+  }, [selectedGroup?.dbId, user?.id]);
 
   function parseMinutes(time: string): number {
     if (time === "방금 전") return 0;
     const m = time.match(/^(\d+)분/);
     return m ? parseInt(m[1]) : 999;
   }
-  const recentFeed  = FEED_ITEMS.filter(item => parseMinutes(item.time) <= 30);
+  const dbFeedItems: FeedItem[] = activityFeed.map((post, index) => {
+    const vt = VERIFY_TYPES[(post.verify_type as VerifyTypeKey) ?? "step_walk"] ?? VERIFY_TYPES.step_walk;
+    return {
+      id: post.id,
+      postId: post.id,
+      user: post.author_name ?? "챌리 유저",
+      seed: post.user_id,
+      time: formatActivityTime(post.created_at),
+      caption: post.message,
+      groupTitle: vt.label,
+      verifyEmoji: vt.emoji,
+      img: post.photo_url ?? "",
+      aspect: index % 3 === 0 ? "tall" : "square",
+      reactionCount: post.reactionCount,
+      myReaction: post.myReaction,
+    };
+  });
+  const recentFeed  = (dbFeedItems.length ? dbFeedItems : FEED_ITEMS).filter(item => parseMinutes(item.time) <= 30 || dbFeedItems.length > 0);
 
   /* ── 스와이프: 수평/수직 판별 ── */
   function touchBegin(x: number, y: number) {
@@ -407,6 +481,64 @@ export function Home() {
                     그룹 둘러보기
                   </button>
                 </div>
+              ) : isChallengeEnded ? (
+              <div
+                className="absolute inset-0 overflow-hidden cursor-pointer"
+                onClick={() => navigate(`/challenge/group/${selectedGroupId}/result`)}
+              >
+                <img
+                  src={selectedGroup?.cover}
+                  alt={selectedGroup?.title ?? ""}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  draggable={false}
+                />
+                <div className="absolute inset-0" style={{
+                  background: (selectedGroup?.rate ?? 0) >= 50
+                    ? "linear-gradient(180deg,rgba(255,51,85,0.50) 0%,rgba(0,0,0,0.70) 60%,rgba(0,0,0,0.92) 100%)"
+                    : "linear-gradient(180deg,rgba(30,30,40,0.60) 0%,rgba(0,0,0,0.75) 60%,rgba(0,0,0,0.92) 100%)",
+                }} />
+
+                {/* 배지 */}
+                <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+                  style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                  <span className="text-[11px] font-bold text-white/70">챌린지 종료</span>
+                </div>
+
+                {/* 중앙 달성률 */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                  <span className="text-[68px] leading-none">
+                    {(selectedGroup?.rate ?? 0) >= 50 ? "🏆" : "💪"}
+                  </span>
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-white font-black text-[72px] leading-none tabular-nums italic"
+                      style={{ textShadow: "0 4px 24px rgba(0,0,0,0.6)" }}>
+                      {selectedGroup?.rate ?? 0}
+                    </span>
+                    <span className="text-white font-black text-[32px] italic opacity-80">%</span>
+                  </div>
+                  <p className="text-white font-black text-[20px]">
+                    챌린지 {(selectedGroup?.rate ?? 0) >= 50 ? "달성 🎉" : "미달성 😢"}
+                  </p>
+                </div>
+
+                {/* 하단 그룹명 + CTA */}
+                <div className="absolute bottom-0 left-0 right-0 px-5 pb-5">
+                  <h2 className="font-black text-[22px] text-white leading-tight mb-2">
+                    {selectedGroup?.title ?? ""}
+                  </h2>
+                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl w-fit"
+                    style={{
+                      background: (selectedGroup?.rate ?? 0) >= 50 ? "#FF3355" : "rgba(255,255,255,0.15)",
+                      backdropFilter: "blur(8px)",
+                    }}>
+                    {(selectedGroup?.rate ?? 0) >= 50
+                      ? <><Trophy className="w-4 h-4 text-white" /><span className="text-white font-bold text-[13px]">결과 보기</span></>
+                      : <><ArrowRight className="w-4 h-4 text-white" /><span className="text-white font-bold text-[13px]">결과 보기</span></>
+                    }
+                  </div>
+                </div>
+              </div>
+
               ) : (<>
 
               {/* 배경: 그룹 대표 이미지 */}
@@ -830,7 +962,7 @@ export function Home() {
             onClick={() => guardAction(() => {
               if (selectedGroup) {
                 const vType = selectedGroup.verifyType as VerifyTypeKey;
-                beginVerification({ verifyType: vType });
+                beginVerification({ verifyType: vType, groupId: selectedGroup.dbId ?? null });
                 navigate(`/verify/guide/${vType}`);
               } else {
                 navigate("/challenge");
@@ -910,12 +1042,15 @@ function FeedCard({ item }: { item: FeedItem; key?: React.Key }) {
     navigate("/challenge/group/feed/activity", {
       state: {
         imgSrc: item.img,
+        postId: item.postId,
         grad: ["#FF3355", "#FF6680"] as [string, string],
         name: item.user,
         seed: item.seed,
         time: item.time,
         msg: item.caption,
         type: "verify",
+        reactionCount: item.reactionCount,
+        myReaction: item.myReaction,
       },
     });
   }
@@ -927,12 +1062,16 @@ function FeedCard({ item }: { item: FeedItem; key?: React.Key }) {
     >
       {/* 이미지 */}
       <div className={`relative ${item.aspect === "tall" ? "aspect-[3/4]" : "aspect-square"}`}>
-        <img
-          src={item.img}
-          alt={item.caption}
-          className="w-full h-full object-cover"
-          referrerPolicy="no-referrer"
-        />
+        {item.img ? (
+          <img
+            src={item.img}
+            alt={item.caption}
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[#FF3355] to-[#FF6680]" />
+        )}
         {/* 그라데이션 */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
         {/* 시간 배지 */}

@@ -9,7 +9,7 @@ type Phase = "analyzing" | "passed" | "failed" | "error";
 
 export function Upload() {
   const navigate = useNavigate();
-  const { verificationImageUrl, verificationImageFile, verifyType, theme } = useApp();
+  const { verificationImageUrl, verificationImageFile, verifyType, verificationGroupId, theme } = useApp();
   const [progress, setProgress] = useState(0);
   const [phase, setPhase] = useState<Phase>("analyzing");
   const [result, setResult] = useState<VerifyResult | null>(null);
@@ -50,7 +50,7 @@ export function Upload() {
     };
     rafId = requestAnimationFrame(tick);
 
-    verifyPhotoWithAI(verificationImageFile, key, abortCtrl.signal)
+    verifyPhotoWithAI(verificationImageFile, key, verificationGroupId, abortCtrl.signal)
       .then(res => {
         stopped = true;
         cancelAnimationFrame(rafId);

@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE TABLE IF NOT EXISTS verifications (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  group_id    UUID REFERENCES groups(id) ON DELETE SET NULL,
+  verify_type TEXT,
   verified_at TIMESTAMPTZ DEFAULT NOW(),
   photo_url   TEXT,
   status      TEXT DEFAULT 'completed' CHECK (status IN ('completed', 'skipped')),
@@ -174,6 +176,37 @@ CREATE TABLE IF NOT EXISTS invite_events (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS activity_posts (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id          UUID REFERENCES groups(id) ON DELETE CASCADE NOT NULL,
+  user_id           UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  verification_id   UUID REFERENCES verifications(id) ON DELETE CASCADE UNIQUE,
+  verify_type       TEXT NOT NULL,
+  photo_url         TEXT,
+  message           TEXT NOT NULL,
+  author_name       TEXT,
+  author_avatar_url TEXT,
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS activity_posts_group_created
+  ON activity_posts (group_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS activity_posts_user_created
+  ON activity_posts (user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS activity_reactions (
+  activity_post_id UUID REFERENCES activity_posts(id) ON DELETE CASCADE NOT NULL,
+  user_id          UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  emoji            TEXT NOT NULL CHECK (emoji IN ('❤️', '🔥', '👍', '😮', '🎉')),
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (activity_post_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS activity_reactions_post
+  ON activity_reactions (activity_post_id);
+
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================================
@@ -187,6 +220,8 @@ ALTER TABLE challenge_suggestion_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE friend_invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invite_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activity_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activity_reactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE verifications  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE groups         ENABLE ROW LEVEL SECURITY;
@@ -225,6 +260,22 @@ CREATE POLICY "friend_invites_insert_own" ON friend_invites FOR INSERT WITH CHEC
 CREATE POLICY "invite_events_select_own" ON invite_events FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "invite_events_insert_own" ON invite_events FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+-- Activity posts/reactions: 활동은 공개 조회, 리액션은 본인만 변경
+CREATE POLICY "activity_posts_select" ON activity_posts FOR SELECT USING (TRUE);
+CREATE POLICY "activity_posts_insert_own_member" ON activity_posts FOR INSERT WITH CHECK (
+  auth.uid() = user_id
+  AND EXISTS (
+    SELECT 1 FROM group_members
+    WHERE group_members.group_id = activity_posts.group_id
+      AND group_members.user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "activity_reactions_select" ON activity_reactions FOR SELECT USING (TRUE);
+CREATE POLICY "activity_reactions_insert_own" ON activity_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "activity_reactions_update_own" ON activity_reactions FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "activity_reactions_delete_own" ON activity_reactions FOR DELETE USING (auth.uid() = user_id);
+
 -- Profiles: 자신의 프로필만 접근
 CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "profiles_insert" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
@@ -242,14 +293,8 @@ CREATE POLICY "groups_insert" ON groups FOR INSERT WITH CHECK (auth.uid() = crea
 CREATE POLICY "groups_update" ON groups FOR UPDATE USING (auth.uid() = created_by);
 CREATE POLICY "groups_delete" ON groups FOR DELETE USING (auth.uid() = created_by);
 
--- Group members: 같은 그룹 멤버는 조회 가능, 자신만 가입/탈퇴
-CREATE POLICY "group_members_select" ON group_members FOR SELECT USING (
-  auth.uid() = user_id OR
-  EXISTS (
-    SELECT 1 FROM group_members gm
-    WHERE gm.group_id = group_members.group_id AND gm.user_id = auth.uid()
-  )
-);
+-- Group members: 자신의 가입 기록만 조회, 자신만 가입/탈퇴
+CREATE POLICY "group_members_select" ON group_members FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "group_members_insert" ON group_members FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "group_members_delete" ON group_members FOR DELETE USING (auth.uid() = user_id);
 
@@ -399,6 +444,10 @@ CREATE OR REPLACE TRIGGER challenge_suggestion_comments_count
   AFTER INSERT OR DELETE ON challenge_suggestion_comments
   FOR EACH ROW EXECUTE FUNCTION refresh_challenge_suggestion_counts();
 
+CREATE OR REPLACE TRIGGER activity_reactions_updated_at
+  BEFORE UPDATE ON activity_reactions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
 -- ============================================================
 -- 보안 패치: 하루 중복 인증 방지 (DB 레벨, KST 기준)
 -- ============================================================
@@ -406,6 +455,10 @@ CREATE OR REPLACE TRIGGER challenge_suggestion_comments_count
 -- KST 기준 중복 인증 방지 인덱스 (사용자+날짜 기준)
 CREATE UNIQUE INDEX IF NOT EXISTS verifications_user_day
   ON verifications (user_id, ((verified_at AT TIME ZONE 'Asia/Seoul')::date))
+  WHERE status = 'completed';
+
+CREATE INDEX IF NOT EXISTS verifications_group_created
+  ON verifications (group_id, verified_at DESC)
   WHERE status = 'completed';
 
 -- ============================================================
@@ -442,6 +495,70 @@ BEGIN
   WHERE id = p_user_id;
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION get_group_leaderboard(p_group_id UUID, p_limit INT DEFAULT 30)
+RETURNS TABLE (
+  rank INT,
+  user_id UUID,
+  username TEXT,
+  avatar_url TEXT,
+  total_done INT,
+  recent_done INT,
+  rate INT,
+  streak INT,
+  is_me BOOLEAN
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  WITH completed AS (
+    SELECT
+      v.user_id,
+      ((v.verified_at AT TIME ZONE 'Asia/Seoul')::date) AS day
+    FROM verifications v
+    WHERE v.group_id = p_group_id
+      AND v.status = 'completed'
+  ),
+  member_stats AS (
+    SELECT
+      gm.user_id,
+      p.username,
+      p.avatar_url,
+      COUNT(c.day)::INT AS total_done,
+      COUNT(c.day) FILTER (WHERE c.day >= ((NOW() AT TIME ZONE 'Asia/Seoul')::date - 6))::INT AS recent_done
+    FROM group_members gm
+    JOIN profiles p ON p.id = gm.user_id
+    LEFT JOIN completed c ON c.user_id = gm.user_id
+    WHERE gm.group_id = p_group_id
+    GROUP BY gm.user_id, p.username, p.avatar_url
+  ),
+  ranked AS (
+    SELECT
+      DENSE_RANK() OVER (
+        ORDER BY
+          ms.recent_done DESC,
+          ms.total_done DESC,
+          ms.user_id ASC
+      )::INT AS rank,
+      ms.user_id,
+      ms.username,
+      ms.avatar_url,
+      ms.total_done,
+      ms.recent_done,
+      LEAST(100, ROUND((ms.recent_done::NUMERIC / 7) * 100))::INT AS rate,
+      ms.recent_done::INT AS streak,
+      auth.uid() = ms.user_id AS is_me
+    FROM member_stats ms
+  )
+  SELECT *
+  FROM ranked
+  ORDER BY rank ASC, recent_done DESC, total_done DESC
+  LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 30), 100));
+$$;
+
+GRANT EXECUTE ON FUNCTION get_group_leaderboard(UUID, INT) TO anon, authenticated;
 
 -- ============================================================
 -- STORAGE BUCKET (Supabase 대시보드 > Storage에서 설정)

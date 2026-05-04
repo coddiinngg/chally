@@ -231,18 +231,39 @@ serve(async (req) => {
     return jsonResponse({ error: "이미지 크기가 너무 큽니다. 6MB 이하 이미지를 사용해주세요." }, 413);
   }
 
-  let body: { image: string; verifyType: string };
+  let body: { image: string; verifyType: string; groupId?: string | null };
   try {
     body = JSON.parse(rawBody);
   } catch {
     return jsonResponse({ error: "Invalid request body" }, 400);
   }
 
-  const { image, verifyType } = body;
+  const { image, verifyType, groupId } = body;
   if (!image || !verifyType || !VERIFY_TYPES[verifyType as VerifyTypeKey]) {
     return jsonResponse({ error: "Missing required fields" }, 400);
   }
   const key = verifyType as VerifyTypeKey;
+  let verifiedGroupId: string | null = null;
+
+  if (groupId) {
+    const { data: membership, error: membershipError } = await serviceClient
+      .from("group_members")
+      .select("group_id")
+      .eq("group_id", groupId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (membershipError) {
+      console.error("[verify-photo] Membership check failed:", membershipError);
+      return jsonResponse({ error: "그룹 가입 상태를 확인하지 못했습니다." }, 500);
+    }
+
+    if (!membership) {
+      return jsonResponse({ error: "참여 중인 그룹에서만 인증할 수 있습니다." }, 403);
+    }
+
+    verifiedGroupId = membership.group_id;
+  }
 
   /* ── KST 기준 오늘 범위 계산 ── */
   const { start: todayStart, end: todayEnd } = kstTodayRange();
@@ -324,16 +345,47 @@ serve(async (req) => {
       return jsonResponse({ error: "인증 사진 저장에 실패했습니다. 잠시 후 다시 시도해주세요." }, 500);
     }
 
-    const { error: insertError } = await serviceClient.from("verifications").insert({
+    const { data: verificationRow, error: insertError } = await serviceClient.from("verifications").insert({
       user_id: user.id,
+      group_id: verifiedGroupId,
+      verify_type: key,
       status: "completed",
       photo_url: photoUrl,
       xp_earned: 10,
-    });
+    }).select("id").single();
 
     if (insertError) {
       console.error("Verification insert failed:", insertError);
       return jsonResponse({ error: "DB 저장 실패. 다시 시도해주세요." }, 500);
+    }
+
+    if (verifiedGroupId) {
+      const { data: profile } = await serviceClient
+        .from("profiles")
+        .select("username, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const { data: group } = await serviceClient
+        .from("groups")
+        .select("goal, name")
+        .eq("id", verifiedGroupId)
+        .maybeSingle();
+
+      const { error: activityError } = await serviceClient.from("activity_posts").insert({
+        group_id: verifiedGroupId,
+        user_id: user.id,
+        verification_id: verificationRow?.id ?? null,
+        verify_type: key,
+        photo_url: photoUrl,
+        message: group?.goal ? `${group.goal} 인증 완료` : `${group?.name ?? "챌린지"} 인증 완료`,
+        author_name: profile?.username ?? user.email?.split("@")[0] ?? "챌리 유저",
+        author_avatar_url: profile?.avatar_url ?? null,
+      });
+
+      if (activityError) {
+        console.error("Activity post insert failed:", activityError);
+      }
     }
 
     await serviceClient.rpc("increment_user_xp", { p_user_id: user.id, p_amount: 10 });
