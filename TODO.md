@@ -88,8 +88,10 @@
 - [x] `activity_posts` 테이블 추가
 - [x] `activity_reactions` 테이블 추가
 - [x] 인증 요청에 그룹 UUID 전달
-- [x] Edge Function `verify-photo`에서 멤버십 확인 후 인증 저장
+- [x] Edge Function `verify-photo`에서 그룹 인증 타입/기간/멤버십 확인 후 인증 저장
 - [x] 인증 성공 시 `activity_posts` 자동 생성
+- [x] `verifications` 저장 실패 시 업로드된 인증 사진 Storage 정리
+- [x] 일일 인증 중복 제한을 사용자 전체 기준에서 그룹별 기준으로 변경
 - [x] 그룹 상세 활동 탭을 `activity_posts` 기반으로 우선 로드
 - [x] 전체 피드를 `activity_posts` 기반으로 로드
 - [x] 홈 실시간 인증 피드를 `activity_posts` 기반으로 우선 로드
@@ -227,3 +229,4 @@ supabase migration list
 - `20260505001000_group_messages.sql`
 - `20260505002000_public_profile_rpc.sql`
 - `20260505003000_group_messages_realtime.sql`
+- `20260505004000_group_scoped_verification_uniqueness.sql`

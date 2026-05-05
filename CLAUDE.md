@@ -169,9 +169,10 @@ supabase secrets set GEMINI_API_KEY=<key>
 ### 인증 흐름
 1. 클라이언트가 base64 이미지 + `verifyType` + `groupId` 전송
 2. Rate limit 확인 (사용자 일 20회)
-3. 그룹 인증이면 `group_members` 멤버십 확인
+3. 그룹 인증이면 DB의 그룹 인증 타입/진행 기간과 `group_members` 멤버십 확인
 4. Gemini 2.0 Flash Lite로 AI 판정
 5. 통과 시: Storage 업로드 → `verifications` INSERT → `activity_posts` INSERT → XP +10
+6. `verifications` INSERT 실패 시 업로드된 인증 사진은 Storage에서 정리
 
 ### 인증 타입 (VerifyTypeKey)
 | key | 라벨 |
@@ -221,3 +222,4 @@ supabase secrets set GEMINI_API_KEY=<key>
 | `20260505001000_group_messages.sql` | 그룹 채팅/채팅 리액션 |
 | `20260505002000_public_profile_rpc.sql` | 공개 프로필 조회/검색 RPC |
 | `20260505003000_group_messages_realtime.sql` | 그룹 채팅 Realtime publication |
+| `20260505004000_group_scoped_verification_uniqueness.sql` | 그룹별 일일 인증 중복 제한 |

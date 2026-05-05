@@ -231,6 +231,15 @@ interface VerifyResult {
   reason: string;
 }
 
+interface VerificationGroup {
+  id: string;
+  verify_type: string | null;
+  challenge_start: string | null;
+  challenge_end: string | null;
+  goal: string | null;
+  name: string | null;
+}
+
 /** 타입별 서버사이드 이중 검증: AI가 통과시켜도 서버에서 재확인 */
 const SERVER_VALIDATORS: Partial<Record<VerifyTypeKey, (obj: Record<string, unknown>) => string | null>> = {
   step_walk: (obj) => {
@@ -348,6 +357,14 @@ async function uploadWithRetry(
   return null;
 }
 
+async function removeUploadedPhoto(
+  serviceClient: ReturnType<typeof createClient>,
+  filePath: string,
+) {
+  const { error } = await serviceClient.storage.from("verifications").remove([filePath]);
+  if (error) console.error("Storage cleanup failed:", error);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS_HEADERS });
@@ -391,8 +408,38 @@ serve(async (req) => {
   }
   const key = verifyType as VerifyTypeKey;
   let verifiedGroupId: string | null = null;
+  let verifiedGroup: VerificationGroup | null = null;
 
   if (groupId) {
+    const { data: group, error: groupError } = await serviceClient
+      .from("groups")
+      .select("id, verify_type, challenge_start, challenge_end, goal, name")
+      .eq("id", groupId)
+      .maybeSingle();
+
+    if (groupError) {
+      console.error("[verify-photo] Group check failed:", groupError);
+      return jsonResponse({ error: "그룹 정보를 확인하지 못했습니다." }, 500);
+    }
+
+    if (!group) {
+      return jsonResponse({ error: "존재하지 않는 그룹입니다." }, 404);
+    }
+
+    verifiedGroup = group as VerificationGroup;
+
+    if (verifiedGroup.verify_type !== key) {
+      return jsonResponse({ error: "이 그룹의 인증 방식과 요청한 인증 방식이 일치하지 않습니다." }, 400);
+    }
+
+    const now = Date.now();
+    if (verifiedGroup.challenge_start && now < new Date(verifiedGroup.challenge_start).getTime()) {
+      return jsonResponse({ error: "아직 챌린지가 시작되지 않았습니다." }, 403);
+    }
+    if (verifiedGroup.challenge_end && now > new Date(verifiedGroup.challenge_end).getTime()) {
+      return jsonResponse({ error: "이미 종료된 챌린지입니다." }, 403);
+    }
+
     const { data: membership, error: membershipError } = await serviceClient
       .from("group_members")
       .select("group_id")
@@ -409,7 +456,7 @@ serve(async (req) => {
       return jsonResponse({ error: "참여 중인 그룹에서만 인증할 수 있습니다." }, 403);
     }
 
-    verifiedGroupId = membership.group_id;
+    verifiedGroupId = verifiedGroup.id;
   }
 
   /* ── KST 기준 오늘 범위 계산 ── */
@@ -502,6 +549,7 @@ serve(async (req) => {
     }).select("id").single();
 
     if (insertError) {
+      await removeUploadedPhoto(serviceClient, filePath);
       // unique_violation (23505) = KST 기준 오늘 이미 인증 완료
       if (insertError.code === "23505") {
         return jsonResponse({ error: "오늘 이미 인증을 완료했어요. 내일 다시 도전해보세요!" }, 409);
@@ -517,19 +565,13 @@ serve(async (req) => {
         .eq("id", user.id)
         .maybeSingle();
 
-      const { data: group } = await serviceClient
-        .from("groups")
-        .select("goal, name")
-        .eq("id", verifiedGroupId)
-        .maybeSingle();
-
       const { error: activityError } = await serviceClient.from("activity_posts").insert({
         group_id: verifiedGroupId,
         user_id: user.id,
         verification_id: verificationRow?.id ?? null,
         verify_type: key,
         photo_url: photoUrl,
-        message: group?.goal ? `${group.goal} 인증 완료` : `${group?.name ?? "챌린지"} 인증 완료`,
+        message: verifiedGroup?.goal ? `${verifiedGroup.goal} 인증 완료` : `${verifiedGroup?.name ?? "챌린지"} 인증 완료`,
         author_name: profile?.username ?? user.email?.split("@")[0] ?? "챌리 유저",
         author_avatar_url: profile?.avatar_url ?? null,
       });

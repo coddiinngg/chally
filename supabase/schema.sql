@@ -527,10 +527,17 @@ END $$;
 -- 보안 패치: 하루 중복 인증 방지 (DB 레벨, KST 기준)
 -- ============================================================
 
--- KST 기준 중복 인증 방지 인덱스 (사용자+날짜 기준)
-CREATE UNIQUE INDEX IF NOT EXISTS verifications_user_day
+-- KST 기준 중복 인증 방지 인덱스
+-- 그룹 인증은 사용자+그룹+날짜 기준 1회, 그룹 없는 단독 인증은 사용자+날짜 기준 1회
+CREATE UNIQUE INDEX IF NOT EXISTS verifications_user_group_day
+  ON verifications (user_id, group_id, ((verified_at AT TIME ZONE 'Asia/Seoul')::date))
+  WHERE status = 'completed'
+    AND group_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS verifications_user_standalone_day
   ON verifications (user_id, ((verified_at AT TIME ZONE 'Asia/Seoul')::date))
-  WHERE status = 'completed';
+  WHERE status = 'completed'
+    AND group_id IS NULL;
 
 CREATE INDEX IF NOT EXISTS verifications_group_created
   ON verifications (group_id, verified_at DESC)
