@@ -432,6 +432,9 @@ export interface Database {
           avatar_url: string | null;
           streak_count: number;
           xp_total: number;
+          verification_total: number;
+          verification_rate: number;
+          joined_groups: { id: string; name: string }[];
         }[];
       };
       search_public_profiles: {

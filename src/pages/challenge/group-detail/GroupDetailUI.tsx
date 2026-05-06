@@ -16,6 +16,7 @@ type ActivityItem = {
   type: "verify" | "streak" | "rank" | "comment";
   grad: [string, string];
   photoUrl?: string | null;
+  avatarUrl?: string | null;
   reactionCount?: number;
   myReaction?: string | null;
 };
@@ -42,7 +43,7 @@ export function GroupDetailUI() {
   const skipAnim = locState?.skipAnimation ?? false;
   const [mounted, setMounted]                   = useState(skipAnim);
   const [tab, setTab]                           = useState<"leaderboard" | "activity" | "gallery">(locState?.tab ?? "activity");
-  const [lightbox, setLightbox]                 = useState<{ url: string; name: string; seed: string; time: string } | null>(null);
+  const [lightbox, setLightbox]                 = useState<{ url: string; name: string; seed: string; avatarUrl?: string | null; time: string } | null>(null);
   const [copied, setCopied]                     = useState(false);
   const [showInvite, setShowInvite]             = useState(false);
   const [showJoinConfirm, setShowJoinConfirm]   = useState(false);
@@ -139,7 +140,6 @@ export function GroupDetailUI() {
   })) : [];
   const top3     = leaderboard.slice(0, 3);
   const restList = leaderboard.slice(3);
-  const top3Seeds = top3.map(r => r.seed);
   const vt       = VERIFY_TYPES[(group?.verifyType as VerifyTypeKey) ?? "step_walk"];
   const heroImg  = group?.cover ?? "";
   const myRank   = leaderboard.find(r => r.isMe);
@@ -195,6 +195,7 @@ export function GroupDetailUI() {
     type: "verify",
     grad: [["#FF3355", "#FF6680"], ["#38BDF8", "#0EA5E9"], ["#34d399", "#059669"]][index % 3] as [string, string],
     photoUrl: post.photo_url,
+    avatarUrl: post.author_avatar_url,
     reactionCount: post.reactionCount,
     myReaction: post.myReaction,
   }));
@@ -204,6 +205,7 @@ export function GroupDetailUI() {
     url: post.photo_url ?? "",
     name: post.author_name ?? "챌리 유저",
     seed: post.user_id,
+    avatarUrl: post.author_avatar_url,
     time: formatActivityTime(post.created_at),
   }));
   const visibleGalleryItems = galleryItems;
@@ -332,9 +334,9 @@ export function GroupDetailUI() {
             }}>
             <div className="flex items-center gap-3">
               <div className="flex -space-x-2.5 shrink-0">
-                {top3Seeds.map((seed, i) => (
-                  <img key={i} src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`}
-                    className="w-10 h-10 rounded-full border-2 border-white bg-slate-100 shrink-0" />
+                {top3.map((p, i) => (
+                  <img key={i} src={p.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.seed}`}
+                    className="w-10 h-10 rounded-full border-2 border-white bg-slate-100 shrink-0 object-cover" />
                 ))}
                 <div className="w-10 h-10 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center shrink-0">
                   <span className="text-[9px] font-black text-slate-500">+{Math.max(0, group.members - 3)}</span>
@@ -525,8 +527,8 @@ export function GroupDetailUI() {
                   {/* 상단: 기본 정보 */}
                   <div className="px-4 pt-3.5 pb-3 flex items-center gap-3">
                     <div className="relative shrink-0">
-                      <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${myRank.seed}`}
-                        className="w-12 h-12 rounded-full bg-slate-100" />
+                      <img src={myRank.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${myRank.seed}`}
+                        className="w-12 h-12 rounded-full bg-slate-100 object-cover" />
                       <span className="absolute -bottom-1 -right-1 text-[9px] font-black text-white bg-[#FF3355] px-1.5 py-0.5 rounded-full leading-none">나</span>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -631,8 +633,8 @@ export function GroupDetailUI() {
                             </div>
                           )}
                           <img
-                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${p.seed}`}
-                            className="rounded-full bg-slate-100"
+                            src={p.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.seed}`}
+                            className="rounded-full bg-slate-100 object-cover"
                             style={{
                               width: avatarSize,
                               height: avatarSize,
@@ -661,7 +663,7 @@ export function GroupDetailUI() {
                 {/* 4위~ 리스트 */}
                 {restList.length > 0 && (
                   <div className="bg-white">
-                    {restList.map(({ rank, name, seed, streak, rate: r, isMe }, i) => (
+                    {restList.map(({ rank, name, seed, avatarUrl, streak, rate: r, isMe }, i) => (
                       <div key={name}>
                         {i > 0 && <div className="h-px bg-slate-50 mx-4" />}
                         <div
@@ -670,8 +672,8 @@ export function GroupDetailUI() {
                           onClick={() => !isMe && navigate(`/user/${seed}`)}>
                           <span className={cn("w-6 text-center text-[13px] font-black tabular-nums shrink-0",
                             isMe ? "text-[#FF3355]" : "text-slate-300")}>{rank}</span>
-                          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`}
-                            className="w-9 h-9 rounded-full bg-slate-100 shrink-0" />
+                          <img src={avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`}
+                            className="w-9 h-9 rounded-full bg-slate-100 shrink-0 object-cover" />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                               <p className={cn("text-[13px] font-bold truncate",
@@ -764,8 +766,8 @@ export function GroupDetailUI() {
                       {/* 바텀 그라데이션 + 아바타 */}
                       <div className="absolute inset-x-0 bottom-0 h-10 pointer-events-none"
                         style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55), transparent)" }} />
-                      <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`} alt=""
-                        className="absolute bottom-1.5 left-1.5 w-5 h-5 rounded-full bg-white border border-white/60" />
+                      <img src={item.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`} alt=""
+                        className="absolute bottom-1.5 left-1.5 w-5 h-5 rounded-full bg-white border border-white/60 object-cover" />
                     </button>
                   ))}
                 </div>
@@ -811,8 +813,8 @@ export function GroupDetailUI() {
           {/* 닫기 */}
           <div className="flex items-center justify-between px-4 pt-5 pb-3 shrink-0">
             <div className="flex items-center gap-2.5">
-              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${lightbox.seed}`} alt=""
-                className="w-9 h-9 rounded-full bg-white/10 border border-white/20" />
+              <img src={lightbox.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${lightbox.seed}`} alt=""
+                className="w-9 h-9 rounded-full bg-white/10 border border-white/20 object-cover" />
               <div>
                 <p className="text-white font-black text-[13px] leading-none">{lightbox.name}</p>
                 <p className="text-white/45 text-[11px] mt-0.5">{lightbox.time}</p>
@@ -1045,8 +1047,8 @@ function ActivityCard({
             className="flex items-center gap-1.5 mb-1 w-full active:opacity-70 transition-opacity"
             onClick={e => { e.stopPropagation(); navigate(`/user/${item.userId ?? item.seed}`); }}
           >
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`}
-              className="w-5 h-5 rounded-full bg-white/20 shrink-0" />
+            <img src={item.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`}
+              className="w-5 h-5 rounded-full bg-white/20 shrink-0 object-cover" />
             <span className="text-white text-[11px] font-black truncate">{item.name}</span>
             <span className="text-white/50 text-[10px] ml-auto shrink-0">{item.time}</span>
           </button>

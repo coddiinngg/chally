@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { TrendingUp, Flame, Calendar, Trophy, CheckCircle2, ChevronRight, ImageIcon, ChevronLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 
 function useCountUp(target: number, duration = 900, delay = 0) {
@@ -122,6 +122,7 @@ function CalendarHeatmap({
 
 export function Stats() {
   const { verificationHistory, groups } = useApp();
+  const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
   const [calOffset, setCalOffset] = useState(0);
   const calendarRef = useRef<HTMLDivElement | null>(null);
@@ -427,18 +428,24 @@ export function Stats() {
         </Link>
 
         {/* 인증 갤러리 */}
-        <Link
-          to="/gallery"
-          className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.05] shadow-[0_2px_14px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-transform duration-150"
+        <div
+          onClick={() => navigate("/gallery")}
+          className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.05] shadow-[0_2px_14px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-transform duration-150 cursor-pointer"
           style={slide(520)}
         >
           <div className="shrink-0">
             {recentPhotoThumbs.length > 0 ? (
               <div className="flex -space-x-2">
                 {recentPhotoThumbs.map(thumb => (
-                  <img key={thumb.id} src={thumb.src} alt="최근 인증"
-                    className="w-10 h-10 rounded-xl border-2 border-white object-cover overflow-hidden shrink-0"
-                    referrerPolicy="no-referrer" />
+                  <button
+                    key={thumb.id}
+                    onClick={e => { e.stopPropagation(); navigate("/gallery", { state: { openId: thumb.id } }); }}
+                    className="rounded-xl overflow-hidden border-2 border-white shrink-0 active:scale-90 transition-transform"
+                  >
+                    <img src={thumb.src} alt="최근 인증"
+                      className="w-10 h-10 object-cover"
+                      referrerPolicy="no-referrer" />
+                  </button>
                 ))}
               </div>
             ) : (
@@ -459,7 +466,7 @@ export function Stats() {
           <div className="w-8 h-8 rounded-full bg-[#FFE8EC] flex items-center justify-center shrink-0">
             <ChevronRight className="w-4 h-4 text-[#FF3355]" />
           </div>
-        </Link>
+        </div>
 
         <div className="h-4" />
       </div>

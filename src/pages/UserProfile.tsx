@@ -1,53 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, Flame, Trophy, Star } from "lucide-react";
+import { ChevronLeft, Flame } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { getGrade, getNextGrade } from "../lib/grades";
 import type { PublicProfileRecord } from "../types/database";
-
-interface UserStats {
-  streak: number;
-  rate: number;
-  total: number;
-}
-
-interface UserGroup {
-  id: string;
-  title: string;
-}
-
-function rateColor(r: number) {
-  if (r >= 90) return "#22c55e";
-  if (r >= 70) return "#f59e0b";
-  return "#94a3b8";
-}
-
-function computeStreak(verifications: { verified_at: string; status: string }[]) {
-  const completedDays = new Set(
-    verifications
-      .filter(v => v.status === "completed")
-      .map(v => v.verified_at.slice(0, 10))
-  );
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
-  if (!completedDays.has(cursor.toISOString().slice(0, 10))) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  let streak = 0;
-  while (completedDays.has(cursor.toISOString().slice(0, 10))) {
-    streak++;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return streak;
-}
 
 export function UserProfile() {
   const { seed: userId = "" } = useParams<{ seed: string }>();
   const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
   const [profile, setProfile] = useState<PublicProfileRecord | null>(null);
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [groups, setGroups] = useState<UserGroup[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -63,31 +25,9 @@ export function UserProfile() {
   async function loadUserData(id: string) {
     setLoading(true);
     try {
-      const [{ data: profileData }, { data: verifications }, { data: memberships }] = await Promise.all([
-        supabase.rpc("get_public_profile", { p_user_id: id }),
-        supabase.from("verifications").select("verified_at, status").eq("user_id", id),
-        supabase.from("group_members").select("group_id, groups(id, name)").eq("user_id", id).limit(3),
-      ]);
-
-      setProfile(profileData?.[0] ?? null);
-
-      if (verifications) {
-        const completed = verifications.filter(v => v.status === "completed");
-        const total = verifications.length;
-        setStats({
-          streak: computeStreak(verifications),
-          rate: total > 0 ? Math.round((completed.length / total) * 100) : 0,
-          total: completed.length,
-        });
-      }
-
-      if (memberships) {
-        const userGroups: UserGroup[] = memberships
-          .map((m: any) => m.groups)
-          .filter(Boolean)
-          .map((g: any) => ({ id: g.id, title: g.name }));
-        setGroups(userGroups);
-      }
+      // SECURITY DEFINER RPC — RLS 우회해서 다른 유저 데이터 접근
+      const { data } = await supabase.rpc("get_public_profile", { p_user_id: id });
+      setProfile(data?.[0] ?? null);
     } finally {
       setLoading(false);
     }
@@ -99,6 +39,10 @@ export function UserProfile() {
   const xpTotal = profile?.xp_total ?? 0;
   const grade = getGrade(xpTotal);
   const nextGrade = getNextGrade(grade.level);
+  const streak = profile?.streak_count ?? 0;
+  const verTotal = profile?.verification_total ?? 0;
+  const verRate = profile?.verification_rate ?? 0;
+  const joinedGroups = profile?.joined_groups ?? [];
 
   return (
     <div className="relative flex flex-col flex-1 overflow-hidden bg-[#FAFAFA] dark:bg-[#090B10]">
@@ -196,7 +140,7 @@ export function UserProfile() {
               </div>
             )}
 
-            {stats && (
+            {!loading && (
               <div
                 className="flex gap-2 mt-4 w-full"
                 style={{
@@ -206,9 +150,9 @@ export function UserProfile() {
                 }}
               >
                 {[
-                  { label: "달성", val: stats.total, suffix: "회" },
-                  { label: "연속", val: stats.streak, suffix: "일" },
-                  { label: "달성률", val: stats.rate, suffix: "%" },
+                  { label: "달성", val: verTotal, suffix: "회" },
+                  { label: "연속", val: streak, suffix: "일" },
+                  { label: "달성률", val: verRate, suffix: "%" },
                   { label: "경험치", val: xpTotal, suffix: "xp" },
                 ].map(({ label, val, suffix }) => (
                   <div key={label} className="flex-1 flex flex-col items-center bg-white/20 border border-white/20 rounded-2xl py-2.5">
@@ -230,14 +174,14 @@ export function UserProfile() {
             <div className="rounded-2xl bg-white dark:bg-[#12161E] border border-black/[0.04] dark:border-white/[0.07] p-8 flex flex-col items-center">
               <p className="text-[13px] text-slate-400">불러오는 중...</p>
             </div>
-          ) : groups.length === 0 ? (
+          ) : joinedGroups.length === 0 ? (
             <div className="rounded-2xl bg-white dark:bg-[#12161E] border border-black/[0.04] dark:border-white/[0.07] p-8 flex flex-col items-center">
               <span className="text-3xl mb-2">🏅</span>
               <p className="text-[13px] text-slate-400">참여 챌린지 정보가 없습니다</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {groups.map((g, i) => (
+              {joinedGroups.map((g, i) => (
                 <div
                   key={g.id}
                   className="rounded-2xl bg-white dark:bg-[#12161E] border border-black/[0.04] dark:border-white/[0.07] px-4 py-4 flex items-center gap-3 active:bg-slate-50 dark:active:bg-white/[0.04] transition-colors cursor-pointer"
@@ -251,7 +195,7 @@ export function UserProfile() {
                   <div className="w-9 h-9 rounded-xl bg-[#FFE8EC] dark:bg-[#3A1620] flex items-center justify-center shrink-0">
                     <Flame className="w-4 h-4 text-[#FF3355]" />
                   </div>
-                  <p className="flex-1 font-bold text-[14px] text-slate-800 dark:text-slate-100">{g.title}</p>
+                  <p className="flex-1 font-bold text-[14px] text-slate-800 dark:text-slate-100">{g.name}</p>
                 </div>
               ))}
             </div>

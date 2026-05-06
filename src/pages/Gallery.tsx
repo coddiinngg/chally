@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ChevronLeft, X, ChevronRight, CheckCircle2, ImageIcon, Share2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useApp } from "../contexts/AppContext";
 import { shareOrCopy } from "../lib/share";
+import { supabase } from "../lib/supabase";
 
 type ViewMode = "grid" | "month" | "year";
 
@@ -78,12 +79,14 @@ function PhotoCard({ grad, label, photoUrl, size }: {
 
 export function Gallery() {
   const navigate = useNavigate();
+  const { state: locationState } = useLocation() as { state: { openId?: string } | null };
   const { verificationHistory } = useApp();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [cols, setCols] = useState(3);
   const [filter, setFilter] = useState("전체");
   const [mounted, setMounted] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [reactionMap, setReactionMap] = useState<Map<string, number>>(new Map());
   const wheelAcc = useRef(0);
   const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -110,6 +113,30 @@ export function Gallery() {
   });
 
   useEffect(() => { const t = setTimeout(() => setMounted(true), 60); return () => clearTimeout(t); }, []);
+
+  // 인증별 좋아요 수 로드
+  useEffect(() => {
+    const ids = verificationHistory.filter(v => v.status === "completed").map(v => v.id);
+    if (!ids.length) return;
+    void (async () => {
+      const { data: posts } = await supabase
+        .from("activity_posts")
+        .select("id, verification_id")
+        .in("verification_id", ids);
+      if (!posts?.length) return;
+      const postIds = posts.map(p => p.id);
+      const { data: reactions } = await supabase
+        .from("activity_reactions")
+        .select("activity_post_id")
+        .in("activity_post_id", postIds);
+      const countByPost = new Map<string, number>();
+      (reactions ?? []).forEach(r => countByPost.set(r.activity_post_id, (countByPost.get(r.activity_post_id) ?? 0) + 1));
+      const map = new Map<string, number>();
+      posts.forEach(p => { if (p.verification_id) map.set(p.verification_id, countByPost.get(p.id) ?? 0); });
+      setReactionMap(map);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verificationHistory.length]);
 
   const ALL_PHOTOS: Photo[] = verificationHistory
     .filter(v => v.status === "completed")
@@ -203,9 +230,16 @@ export function Gallery() {
   function openLightbox(idx: number) {
     lightboxJustOpenedRef.current = true;
     setLightbox(idx); setScale(1); setPanX(0); setPanY(0); setSwipeOffset(0);
-    // 애니메이션 완료 후 플래그 리셋
     setTimeout(() => { lightboxJustOpenedRef.current = false; }, 400);
   }
+
+  // Stats 페이지 썸네일 탭 → 특정 사진 자동 오픈
+  useEffect(() => {
+    if (!locationState?.openId || !mounted) return;
+    const idx = filtered.findIndex(p => p.id === locationState.openId);
+    if (idx !== -1) openLightbox(idx);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, locationState?.openId]);
   function closeLightbox() {
     setLightbox(null); setScale(1); setPanX(0); setPanY(0);
   }
@@ -537,7 +571,15 @@ export function Gallery() {
               <p className="text-white/40 text-[11px] font-bold">
                 {dayLabel(item.year, item.month, item.day)} · {item.month}월 {item.day}일
               </p>
-              <p className="text-white text-[15px] font-bold mt-0.5">{item.label}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-white text-[15px] font-bold">{item.label}</p>
+                {(reactionMap.get(item.id) ?? 0) > 0 && (
+                  <div className="flex items-center gap-1 bg-white/15 backdrop-blur-sm rounded-full px-2 py-0.5">
+                    <span className="text-[12px] leading-none">👍</span>
+                    <span className="text-white text-[11px] font-black tabular-nums">{reactionMap.get(item.id)}</span>
+                  </div>
+                )}
+              </div>
             </div>
             <button
               onClick={closeLightbox}

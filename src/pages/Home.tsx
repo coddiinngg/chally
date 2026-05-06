@@ -95,6 +95,7 @@ export function Home() {
   }, []);
 
   useEffect(() => {
+    if (feedCache) return; // 캐시 있으면 재요청 생략 — 뒤로가기 시 깜박임 방지
     let cancelled = false;
     async function loadHomeFeed() {
       try {
@@ -243,6 +244,7 @@ export function Home() {
       streak: row.streak,
       rate: row.rate,
       seed: row.userId,
+      avatarUrl: row.avatarUrl,
       isMe: row.isMe,
     }))
     : [];
@@ -784,7 +786,7 @@ export function Home() {
                 return (
                   <>
                     <div className="px-3 shrink-0 flex gap-2 items-end">
-                      {podium.map(({ rank, name, seed, streak, rate, isMe }, i) => {
+                      {podium.map(({ rank, name, seed, avatarUrl, streak, rate, isMe }, i) => {
                         const is1st = rank === 1;
                         return (
                           <div key={rank}
@@ -797,8 +799,8 @@ export function Home() {
                             onClick={() => !isMe && navigate(`/user/${seed}`)}>
                             <span className="text-[18px] mb-1.5 leading-none">{MEDAL[rank - 1]}</span>
                             <div className="relative mb-1.5">
-                              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`} alt={name}
-                                className="rounded-full bg-slate-100 border-2"
+                              <img src={avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`} alt={name}
+                                className="rounded-full bg-slate-100 border-2 object-cover"
                                 style={{ width: is1st ? 44 : 36, height: is1st ? 44 : 36, borderColor: isMe ? "#FF3355" : "transparent" }}
                                 draggable={false} />
                               {is1st && <Crown className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
@@ -817,15 +819,15 @@ export function Home() {
                     {/* 4위~ 리스트 */}
                     {rest.length > 0 && (
                       <div className="flex-1 overflow-y-auto overscroll-contain mx-3 mt-2 mb-3 rounded-2xl bg-[#F8F8FA] border border-black/[0.05]">
-                        {rest.map(({ rank, name, seed, streak, rate, isMe }, i) => (
+                        {rest.map(({ rank, name, seed, avatarUrl, streak, rate, isMe }, i) => (
                           <div key={rank}>
                             {i > 0 && <div className="h-px bg-slate-100 mx-3" />}
                             <div className={`flex items-center gap-2.5 px-3 py-2.5 active:opacity-70 transition-opacity cursor-pointer ${isMe ? "bg-[#FFF5F7]" : ""}`}
                               onClick={() => !isMe && navigate(`/user/${seed}`)}>
                               <span className="w-5 text-center text-[12px] font-black tabular-nums shrink-0"
                                 style={{ color: isMe ? "#FF3355" : "rgba(160,160,160,0.7)" }}>{rank}</span>
-                              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`} alt={name}
-                                className="w-7 h-7 rounded-full bg-slate-100 shrink-0" draggable={false} />
+                              <img src={avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`} alt={name}
+                                className="w-7 h-7 rounded-full bg-slate-100 shrink-0 object-cover" draggable={false} />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1">
                                   <p className={`text-[12px] font-bold truncate ${isMe ? "text-[#FF3355]" : "text-slate-700"}`}>{name}</p>
