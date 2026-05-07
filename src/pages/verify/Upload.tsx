@@ -158,9 +158,9 @@ export function Upload() {
         <div className="flex-1 flex flex-col items-center justify-center gap-7 px-8 relative z-10">
           {/* 사진 프레임 */}
           <div className="relative w-full max-w-[240px] aspect-[3/4]">
-            <div className="absolute inset-0 rounded-2xl overflow-hidden"
+            <div className="absolute inset-0 rounded-2xl overflow-hidden bg-black"
               style={{ boxShadow: d ? "none" : "0 8px 32px rgba(0,0,0,0.15)" }}>
-              <img src={verificationImageUrl ?? ""} alt="" className="w-full h-full object-cover"
+              <img src={verificationImageUrl ?? ""} alt="" className="w-full h-full object-contain"
                 style={{ filter: d ? "brightness(0.9)" : "brightness(1)" }} />
               {isPassed && (
                 <div className="absolute inset-0 bg-emerald-400/15 transition-opacity duration-700" />
@@ -237,9 +237,9 @@ export function Upload() {
           {/* ① 실패 요약 */}
           <div className="px-5 pt-2 pb-5 flex items-start gap-4"
             style={{ animation: "upl-slide 0.4s ease both" }}>
-            <div className="relative shrink-0 w-[72px] h-[88px] rounded-2xl overflow-hidden"
+            <div className="relative shrink-0 w-[72px] h-[88px] rounded-2xl overflow-hidden bg-black"
               style={{ boxShadow: `0 0 0 1.5px rgba(239,68,68,${d ? 0.4 : 0.3})` }}>
-              <img src={verificationImageUrl ?? ""} alt="" className="w-full h-full object-cover"
+              <img src={verificationImageUrl ?? ""} alt="" className="w-full h-full object-contain"
                 style={{ filter: d ? "brightness(0.5) saturate(0.3)" : "brightness(0.75) saturate(0.4)" }} />
               <div className="absolute inset-0 bg-red-500/20" />
               <div className="absolute inset-0 flex items-center justify-center">

@@ -36,6 +36,8 @@ let feedCache: ActivityFeedItem[] | null = null;
 let leaderboardCacheMap: Record<string, LeaderboardItem[]> = {};
 // 스크롤 위치 저장 — 뒤로가기 시 복원
 let savedScrollTop = 0;
+// 그룹별 읽지 않은 채팅 카운트 — 세션 내 유지
+let chatUnreadCountMap: Record<string, number> = {};
 
 interface FeedItem {
   id: string;
@@ -73,6 +75,7 @@ export function Home() {
   );
   const [chatAtBottom, setChatAtBottom]     = useState(true);
   const [lastReadMsgId, setLastReadMsgId]   = useState<string | null>(null);
+  const [, setUnreadTick]                   = useState(0);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef      = useRef<HTMLDivElement>(null);
@@ -85,6 +88,10 @@ export function Home() {
   const rateDisplayRef  = useRef<HTMLSpanElement>(null);
   const notifModeRef    = useRef(false);
   notifModeRef.current  = notifMode;
+  const slideIdxRef     = useRef(slideIdx);
+  const selGroupIdRef   = useRef(selectedGroupId);
+  slideIdxRef.current   = slideIdx;
+  selGroupIdRef.current = selectedGroupId;
   const ignoreTapRef    = useRef(false);
   const startX          = useRef(0);
   const startY         = useRef(0);
@@ -245,6 +252,33 @@ export function Home() {
       if (channel) void supabase.removeChannel(channel);
     };
   }, [selectedGroup?.dbId, selectedGroupId, user?.id]);
+
+  // 전체 그룹 미읽음 채팅 카운트 실시간 추적
+  const myGroupsDbKey = myGroups.map(g => g.dbId ?? "").join(",");
+  useEffect(() => {
+    if (!user || myGroups.length === 0) return;
+    const channels = myGroups.flatMap(g => {
+      if (!g.dbId) return [];
+      const ch = supabase
+        .channel(`unread:${g.dbId}`)
+        .on("postgres_changes",
+          { event: "INSERT", schema: "public", table: "group_messages", filter: `group_id=eq.${g.dbId}` },
+          (payload) => {
+            const msg = payload.new as GroupMessageRecord;
+            if (msg.user_id === user.id) return;
+            const isReading = slideIdxRef.current === 2 && selGroupIdRef.current === g.id;
+            if (!isReading) {
+              chatUnreadCountMap[g.id] = (chatUnreadCountMap[g.id] ?? 0) + 1;
+              setUnreadTick(t => t + 1);
+            }
+          }
+        )
+        .subscribe();
+      return [ch];
+    });
+    return () => { channels.forEach(ch => void supabase.removeChannel(ch)); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myGroupsDbKey, user?.id]);
 
   // 참여 중인 그룹 목록이 바뀌면 selectedGroupId 유효성 확인
   useEffect(() => {
@@ -432,7 +466,7 @@ export function Home() {
     } : msg));
   }
 
-  /* 채팅 탭 진입 시 읽음 마커 설정 */
+  /* 채팅 탭 진입 시 읽음 마커 설정 + 미읽음 카운트 초기화 */
   useEffect(() => {
     if (slideIdx === 2 && chats.length > 0 && !lastReadSetRef.current) {
       lastReadSetRef.current = true;
@@ -440,7 +474,11 @@ export function Home() {
       setTimeout(() => setChatAtBottom(true), 50);
     }
     if (slideIdx !== 2) lastReadSetRef.current = false;
-  }, [slideIdx, chats.length]);
+    if (slideIdx === 2 && selectedGroupId && (chatUnreadCountMap[selectedGroupId] ?? 0) > 0) {
+      chatUnreadCountMap[selectedGroupId] = 0;
+      setUnreadTick(t => t + 1);
+    }
+  }, [slideIdx, chats.length, selectedGroupId]);
 
   const slideTx = (i: number) => `translate3d(${(i - slideIdx) * 100}%, 0, 0)`;
   const trans = "transform 0.42s cubic-bezier(0.4, 0, 0.2, 1)";
@@ -724,9 +762,11 @@ export function Home() {
                 {showGroupPicker && (
                   <div className="mb-3" style={{ animation: "picker-in 0.2s ease both" }}>
                     <div className="flex gap-2 pb-1 overflow-x-auto no-scrollbar">
-                      {myGroups.map(g => (
+                      {myGroups.map(g => {
+                        const groupUnread = chatUnreadCountMap[g.id] ?? 0;
+                        return (
                         <button key={g.id} onClick={() => selectGroup(g.id)}
-                          className="shrink-0 flex flex-col items-start px-3 py-2.5 rounded-xl transition-all active:scale-95"
+                          className="relative shrink-0 flex flex-col items-start px-3 py-2.5 rounded-xl transition-all active:scale-95"
                           style={{
                             background: g.id === selectedGroupId ? "rgba(255,51,85,0.9)" : "rgba(255,255,255,0.15)",
                             backdropFilter: "blur(8px)",
@@ -735,8 +775,17 @@ export function Home() {
                           }}>
                           <p className="text-white font-black text-[13px] leading-tight truncate w-full">{g.title}</p>
                           <p className="text-white/60 text-[10px] mt-0.5">{g.members}명 · #{g.myRank}위</p>
+                          {groupUnread > 0 && (
+                            <div className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full flex items-center justify-center"
+                              style={{ background: "#FF3355", boxShadow: "0 2px 6px rgba(255,51,85,0.55)" }}>
+                              <span className="text-[10px] font-black text-white leading-none px-1">
+                                {groupUnread > 99 ? "99+" : groupUnread}
+                              </span>
+                            </div>
+                          )}
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}

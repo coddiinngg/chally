@@ -80,7 +80,7 @@ export function ActivityPhoto() {
           <img
             src={imgSrc}
             alt={msg}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             referrerPolicy="no-referrer"
             draggable={false}
           />
