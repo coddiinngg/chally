@@ -52,6 +52,7 @@ export function Upload() {
 
     verifyPhotoWithAI(verificationImageFile, key, verificationGroupId, abortCtrl.signal)
       .then(res => {
+        if (abortCtrl.signal.aborted) return; // 언마운트 후 무시
         stopped = true;
         cancelAnimationFrame(rafId);
         if (intervalId) clearInterval(intervalId);
@@ -65,6 +66,7 @@ export function Upload() {
         }
       })
       .catch((err: unknown) => {
+        if (abortCtrl.signal.aborted) return; // 언마운트 후 무시
         stopped = true;
         cancelAnimationFrame(rafId);
         if (intervalId) clearInterval(intervalId);

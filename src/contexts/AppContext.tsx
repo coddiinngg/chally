@@ -173,6 +173,7 @@ interface AppContextType {
   // Groups
   groups: Group[];
   groupsLoading: boolean;
+  groupsLoadError: boolean;
   joinGroup: (id: string) => void;
   leaveGroup: (id: string) => void;
   selectedGroupId: string;
@@ -224,10 +225,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [verificationHistory, setVerificationHistory] = useState<DbVerification[]>([]);
   const [groups, setGroups] = useState<Group[]>(DEFAULT_GROUPS);
   const [groupsLoading, setGroupsLoading] = useState(true);
+  const [groupsLoadError, setGroupsLoadError] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const verificationImageUrlRef = useRef<string | null>(null);
+  const pendingGroupOps = useRef(new Set<string>()); // 진행 중인 그룹 가입/탈퇴 요청 중복 방지
 
   useEffect(() => {
     return () => {
@@ -303,7 +306,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           .eq("id", user.id)
           .then(({ error }) => {
             if (error) console.error("Failed to update recovery tickets", error);
-            else void refreshProfile();
+            void refreshProfile(); // 성공/실패 모두 DB값으로 동기화
           });
       }
       return nextValue;
@@ -422,9 +425,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       if (cancelled) return;
 
-      if (groupsError || !dbGroups?.length) {
-        if (groupsError) console.error("Failed to load groups", groupsError);
-        setGroups(DEFAULT_GROUPS);
+      if (groupsError) {
+        console.error("Failed to load groups", groupsError);
+        setGroupsLoadError(true);
+        setGroups([]);
+        setGroupsLoading(false);
+        return;
+      }
+      if (!dbGroups?.length) {
+        setGroups([]);
         setGroupsLoading(false);
         return;
       }
@@ -446,6 +455,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      setGroupsLoadError(false);
       setGroups(dbGroups.map(row => mapDbGroup(row, joinedDbIds)));
       setGroupsLoading(false);
     }
@@ -459,6 +469,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const appId = target?.id ?? id;
     const dbId = target?.dbId;
 
+    if (pendingGroupOps.current.has(appId)) return; // 중복 요청 방지
+
     setGroups(prev => {
       if (prev.some(g => (g.id === appId || g.dbId === id) && g.joined)) return prev;
       return prev.map(g => (g.id === appId || g.dbId === id) ? { ...g, joined: true, members: g.members + 1 } : g);
@@ -466,12 +478,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     if (!user || !dbId) return;
 
+    pendingGroupOps.current.add(appId);
     void supabase
       .from("group_members")
       .insert({ group_id: dbId, user_id: user.id })
       .then(({ error }) => {
+        pendingGroupOps.current.delete(appId);
         if (!error) return;
         if (error.code === "23505") {
+          // 이미 가입됨 — optimistic +1 되돌리기
           setGroups(prev => prev.map(g => g.id === appId ? { ...g, joined: true, members: Math.max(0, g.members - 1) } : g));
           return;
         }
@@ -485,6 +500,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const appId = target?.id ?? id;
     const dbId = target?.dbId;
 
+    if (pendingGroupOps.current.has(appId)) return; // 중복 요청 방지
+
     setGroups(prev => {
       if (!prev.some(g => (g.id === appId || g.dbId === id) && g.joined)) return prev;
       return prev.map(g => (g.id === appId || g.dbId === id) ? { ...g, joined: false, members: Math.max(0, g.members - 1) } : g);
@@ -492,12 +509,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     if (!user || !dbId) return;
 
+    pendingGroupOps.current.add(appId);
     void supabase
       .from("group_members")
       .delete()
       .eq("group_id", dbId)
       .eq("user_id", user.id)
       .then(({ error }) => {
+        pendingGroupOps.current.delete(appId);
         if (!error) return;
         console.error("Failed to leave group", error);
         setGroups(prev => prev.map(g => g.id === appId ? { ...g, joined: true, members: g.members + 1 } : g));
@@ -511,7 +530,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       recoveryTickets, useRecoveryTicket,
       verifyType, setVerifyType,
       verificationGroupId, verificationImageUrl, verificationImageFile, verificationHistory, beginVerification, setVerificationImage, completeCurrentVerification, clearVerification, refreshVerifications,
-      groups, groupsLoading, joinGroup, leaveGroup, selectedGroupId, setSelectedGroupId,
+      groups, groupsLoading, groupsLoadError, joinGroup, leaveGroup, selectedGroupId, setSelectedGroupId,
       notifications, notificationsLoading, markNotifRead, markAllNotifsRead, handleNotifAction, reloadNotifications,
     }}>
       {children}

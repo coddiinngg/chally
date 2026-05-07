@@ -103,7 +103,11 @@ export async function verifyPhotoWithAI(
       throw new Error(err?.error ?? `서버 오류 (${response.status})`);
     }
 
-    return await response.json() as VerifyResult;
+    const data = await response.json() as Record<string, unknown>;
+    if (typeof data.passed !== "boolean") {
+      throw new Error("서버 응답 형식이 올바르지 않습니다.");
+    }
+    return data as unknown as VerifyResult;
 
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {

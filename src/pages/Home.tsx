@@ -57,7 +57,7 @@ interface FeedItem {
 
 export function Home() {
   const navigate = useNavigate();
-  const { nickname, beginVerification, groups, groupsLoading, selectedGroupId, setSelectedGroupId, notifications } = useApp();
+  const { nickname, beginVerification, groups, groupsLoading, groupsLoadError, selectedGroupId, setSelectedGroupId, notifications } = useApp();
   const { user } = useAuth();
   const myGroups = groups.filter(g => g.joined);
   const [slideIdx, setSlideIdx]               = useState(0);
@@ -249,7 +249,7 @@ export function Home() {
 
     return () => {
       cancelled = true;
-      if (channel) void supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel).catch(err => console.error("removeChannel failed:", err));
     };
   }, [selectedGroup?.dbId, selectedGroupId, user?.id]);
 
@@ -276,7 +276,7 @@ export function Home() {
         .subscribe();
       return [ch];
     });
-    return () => { channels.forEach(ch => void supabase.removeChannel(ch)); };
+    return () => { channels.forEach(ch => supabase.removeChannel(ch).catch(err => console.error("removeChannel failed:", err))); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myGroupsDbKey, user?.id]);
 
@@ -571,6 +571,12 @@ export function Home() {
                     ))}
                   </div>
                   <p className="text-white/50 text-[13px] font-semibold">그룹 정보를 불러오는 중...</p>
+                </div>
+              ) : groupsLoadError ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-50 px-8 text-center">
+                  <span className="text-4xl">📡</span>
+                  <p className="text-slate-700 font-black text-[16px]">그룹 정보를 불러오지 못했어요</p>
+                  <p className="text-slate-400 text-[13px]">네트워크 연결을 확인하고 다시 시도해주세요</p>
                 </div>
               ) : myGroups.length === 0 ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-50">

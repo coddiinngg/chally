@@ -21,15 +21,24 @@ export function Camera() {
   const [flash, setFlash] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
     return () => {
       clearTimeout(t);
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
     };
   }, []);
+
+  function showFileError(msg: string) {
+    setFileError(msg);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setFileError(null), 3000);
+  }
 
   const key    = (verifyType as VerifyTypeKey) ?? "step_walk";
   const vt     = VERIFY_TYPES[key] ?? VERIFY_TYPES["step_walk"];
@@ -69,8 +78,8 @@ export function Camera() {
     const file = event.target.files?.[0] ?? null;
     if (!file) return;
     event.target.value = "";
-    if (!file.type.startsWith("image/")) { alert("이미지 파일만 선택할 수 있어요."); return; }
-    if (file.size > MAX_FILE_BYTES) { alert("파일 크기가 너무 큽니다. 30MB 이하 이미지를 사용해주세요."); return; }
+    if (!file.type.startsWith("image/")) { showFileError("이미지 파일만 선택할 수 있어요."); return; }
+    if (file.size > MAX_FILE_BYTES) { showFileError("파일 크기가 너무 큽니다. 30MB 이하 이미지를 사용해주세요."); return; }
     setVerificationImage(file);
     setScanning(true);
     timerRef.current = setTimeout(() => navigate("/verify/upload"), 900);
@@ -118,6 +127,14 @@ export function Camera() {
       {/* 파일 인풋 */}
       <input ref={captureInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFilePick} />
       <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handleFilePick} />
+
+      {/* 파일 에러 토스트 */}
+      {fileError && (
+        <div className="absolute top-16 left-4 right-4 z-50 px-4 py-3 rounded-2xl text-white text-[13px] font-semibold text-center pointer-events-none"
+          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", animation: "cam-in 0.2s ease both" }}>
+          {fileError}
+        </div>
+      )}
 
       {/* 셔터 플래시 */}
       <div className="absolute inset-0 z-50 pointer-events-none bg-white transition-opacity duration-150"

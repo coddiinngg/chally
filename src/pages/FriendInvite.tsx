@@ -118,9 +118,7 @@ export function FriendInvite() {
     return () => { cancelled = true; };
   }, [search, user?.id, invitedKeys]);
 
-  const filtered = friends.filter(f =>
-    f.name.includes(search) || f.handle.includes(search)
-  );
+  const filtered = friends; // DB RPC가 이미 search 기준으로 필터링
 
   async function recordInviteEvent(
     eventType: "copy_code" | "share_link" | "sms_share" | "suggested_friend_invite",
