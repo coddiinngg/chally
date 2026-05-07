@@ -466,12 +466,17 @@ export function Home() {
     } : msg));
   }
 
-  /* 채팅 탭 진입 시 읽음 마커 설정 + 미읽음 카운트 초기화 */
+  /* 채팅 탭 진입 시 읽음 마커 설정 + 하단 스크롤 + 미읽음 카운트 초기화 */
   useEffect(() => {
     if (slideIdx === 2 && chats.length > 0 && !lastReadSetRef.current) {
       lastReadSetRef.current = true;
       setLastReadMsgId(chats[chats.length - 1].id);
-      setTimeout(() => setChatAtBottom(true), 50);
+      // 슬라이드 전환 애니메이션(420ms) 후 하단으로 스크롤
+      setTimeout(() => {
+        const el = chatScrollRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+        setChatAtBottom(true);
+      }, 460);
     }
     if (slideIdx !== 2) lastReadSetRef.current = false;
     if (slideIdx === 2 && selectedGroupId && (chatUnreadCountMap[selectedGroupId] ?? 0) > 0) {
@@ -1051,18 +1056,18 @@ export function Home() {
                 <div ref={chatEndRef} />
               </div>
 
-              {/* 스크롤 아래로 버튼 — 채팅 영역 중앙 */}
+              {/* 스크롤 아래로 버튼 — 입력창 바로 위 */}
               {!chatAtBottom && (
                 <button
-                  className="absolute left-1/2 -translate-x-1/2 bottom-1/2 translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center active:scale-90 transition-transform z-20"
-                  style={{ background: "linear-gradient(135deg,#FF3355,#CC0030)", boxShadow: "0 4px 12px rgba(255,51,85,0.35)" }}
+                  className="absolute left-1/2 -translate-x-1/2 bottom-3 w-7 h-7 rounded-full flex items-center justify-center active:scale-90 transition-transform z-20"
+                  style={{ background: "rgba(0,0,0,0.12)", backdropFilter: "blur(4px)" }}
                   onTouchStart={e => e.stopPropagation()}
                   onClick={() => {
                     const el = chatScrollRef.current;
                     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
                   }}
                 >
-                  <ArrowRight className="w-3.5 h-3.5 text-white rotate-90" />
+                  <ArrowRight className="w-3 h-3 text-slate-500 rotate-90" />
                 </button>
               )}
               </div>{/* relative wrapper 닫기 */}
