@@ -53,17 +53,25 @@ function isPreview() {
   return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "1";
 }
 
+function AuthLoader() {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-white">
+      <div className="w-8 h-8 rounded-full border-[3px] border-[#FF3355]/20 border-t-[#FF3355] animate-spin" />
+    </div>
+  );
+}
+
 /** 비로그인 + 비게스트 → /login 리다이렉트 */
 function ProtectedRoute() {
   const { user, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return <AuthLoader />;
   return (user || isGuestMode() || isPreview()) ? <Outlet /> : <Navigate to="/login" replace />;
 }
 
 /** 로그인 유저만 통과. 게스트 → /login 리다이렉트 */
 function AuthOnlyRoute() {
   const { user, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return <AuthLoader />;
   return (user || isPreview()) ? <Outlet /> : <Navigate to="/login" replace />;
 }
 
