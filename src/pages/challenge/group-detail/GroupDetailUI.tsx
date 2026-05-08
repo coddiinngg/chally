@@ -79,7 +79,6 @@ export function GroupDetailUI() {
   const [showStartBanner, setShowStartBanner]   = useState(false);
   const [showLowRateAlert, setShowLowRateAlert] = useState(false);
   const [showLeave72h, setShowLeave72h]         = useState(false);
-  const [statusTooltip, setStatusTooltip]       = useState<"status" | "contributor" | null>(null);
   const scrollRef                               = useRef<HTMLDivElement>(null);
   const tabBarRef                               = useRef<HTMLDivElement>(null);
   const scrollKey                               = `gd-scroll-${groupId}`;
@@ -417,12 +416,8 @@ export function GroupDetailUI() {
               <div className="w-px h-8 bg-slate-100 shrink-0" />
               <div className="text-right shrink-0">
                 <p className="text-[10px] text-slate-400 font-medium">크루 달성률</p>
-                <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                <div className="flex items-center justify-end mt-0.5">
                   <p className="text-[18px] font-black leading-none" style={{ color: rateColor(group.crewRate) }}>{group.crewRate}%</p>
-                  <span className="text-[11px] font-black px-1.5 py-0.5 rounded-lg leading-none"
-                    style={{ background: gradeColor(group.crewGrade) + "22", color: gradeColor(group.crewGrade) }}>
-                    {group.crewGrade}
-                  </span>
                 </div>
               </div>
             </div>
@@ -542,93 +537,6 @@ export function GroupDetailUI() {
                   <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-700"
                       style={{ width: `${myRank.rate}%`, background: PG }} />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ── 내 크루 멤버 상태 ── */}
-            {crewStatus && (
-              <div className="mt-2 bg-white rounded-2xl overflow-hidden"
-                style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)", animation: "noti-drop 0.2s ease both" }}>
-                <div className="px-4 py-3.5">
-                  <p className="text-[11px] font-black text-slate-400 mb-2.5">내 크루 상태</p>
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    {/* 멤버 상태 pill */}
-                    <button
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl active:opacity-75 transition-opacity"
-                      style={{
-                        background: crewStatus.my_status === "ACTIVE" ? "#ECFDF5"
-                          : crewStatus.my_status === "EXIT_ELIGIBLE" ? "#FFFBEB"
-                          : "#FFF1F2",
-                      }}
-                      onClick={() => setStatusTooltip(v => v === "status" ? null : "status")}
-                    >
-                      {crewStatus.my_status === "ACTIVE"
-                        ? <ShieldCheck className="w-3.5 h-3.5" style={{ color: "#10B981" }} />
-                        : crewStatus.my_status === "EXIT_ELIGIBLE"
-                        ? <Clock className="w-3.5 h-3.5" style={{ color: "#F59E0B" }} />
-                        : <ShieldOff className="w-3.5 h-3.5" style={{ color: "#FF3355" }} />
-                      }
-                      <span className="text-[11px] font-black"
-                        style={{
-                          color: crewStatus.my_status === "ACTIVE" ? "#059669"
-                            : crewStatus.my_status === "EXIT_ELIGIBLE" ? "#D97706"
-                            : "#FF3355",
-                        }}>
-                        {crewStatus.my_status === "ACTIVE" ? "활성"
-                          : crewStatus.my_status === "EXIT_ELIGIBLE" ? "퇴장경고"
-                          : "퇴장됨"}
-                      </span>
-                    </button>
-                    {/* 기여자 여부 */}
-                    <button
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl active:opacity-75 transition-opacity"
-                      style={{ background: crewStatus.my_is_contributor ? "#EFF6FF" : "#F8FAFC" }}
-                      onClick={() => setStatusTooltip(v => v === "contributor" ? null : "contributor")}
-                    >
-                      <span className="text-[11px] font-black"
-                        style={{ color: crewStatus.my_is_contributor ? "#3B82F6" : "#94A3B8" }}>
-                        {crewStatus.my_is_contributor ? "🎯 기여자" : "비기여자"}
-                      </span>
-                    </button>
-                    {/* 퇴장 유예 시 남은 시간 */}
-                    {crewStatus.my_status === "EXIT_ELIGIBLE" && crewStatus.my_exit_deadline && (
-                      <ExitDeadlineCountdown deadline={crewStatus.my_exit_deadline} />
-                    )}
-                  </div>
-
-                  {/* 상태 설명 툴팁 */}
-                  {statusTooltip === "status" && (
-                    <StatusTooltip
-                      status={crewStatus.my_status}
-                      onClose={() => setStatusTooltip(null)}
-                    />
-                  )}
-                  {statusTooltip === "contributor" && (
-                    <ContributorTooltip
-                      isContributor={crewStatus.my_is_contributor}
-                      onClose={() => setStatusTooltip(null)}
-                    />
-                  )}
-                  {/* 크루 전체 통계 */}
-                  <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-50">
-                    <div className="flex-1 text-center">
-                      <p className="text-[15px] font-black text-slate-900">{crewStatus.active_count}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">활성 멤버</p>
-                    </div>
-                    <div className="w-px h-8 bg-slate-100" />
-                    <div className="flex-1 text-center">
-                      <p className="text-[15px] font-black text-slate-900">{crewStatus.contributor_count}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">기여자</p>
-                    </div>
-                    <div className="w-px h-8 bg-slate-100" />
-                    <div className="flex-1 text-center">
-                      <p className="text-[15px] font-black" style={{ color: gradeColor(crewStatus.crew_grade) }}>
-                        {Math.round(crewStatus.crew_rate * 100)}%
-                      </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">크루 달성률</p>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1161,92 +1069,6 @@ export function GroupDetailUI() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function StatusTooltip({ status, onClose }: { status: string | null; onClose: () => void }) {
-  const isActive       = status === "ACTIVE";
-  const isEligible     = status === "EXIT_ELIGIBLE";
-
-  const icon  = isActive ? "✅" : isEligible ? "⏰" : "🚫";
-  const title = isActive ? "활성 상태예요" : isEligible ? "퇴장경고 상태예요" : "퇴장된 상태예요";
-  const body  = isActive
-    ? "정상적으로 챌린지에 참여 중이에요. 48시간 이상 인증을 하지 않으면 '퇴장경고' 상태가 돼요."
-    : isEligible
-    ? "48시간 동안 인증하지 않았어요. 마지막 인증으로부터 72시간이 지나면 자동으로 퇴장됩니다."
-    : "인증 없이 유예 기간이 지나 크루에서 퇴장됐어요. 챌린지 달성률 집계에서 제외됩니다.";
-  const color = isActive ? "#059669" : isEligible ? "#D97706" : "#FF3355";
-  const bg    = isActive ? "#ECFDF5" : isEligible ? "#FFFBEB" : "#FFF1F2";
-
-  return (
-    <div
-      className="mt-2.5 rounded-2xl p-3.5"
-      style={{ background: bg, border: `1px solid ${color}22`, animation: "noti-drop 0.18s ease both" }}
-    >
-      <div className="flex items-start gap-2.5">
-        <span className="text-[18px] leading-none shrink-0 mt-0.5">{icon}</span>
-        <div className="flex-1 min-w-0">
-          <p className="text-[12px] font-black mb-1" style={{ color }}>{title}</p>
-          <p className="text-[11px] leading-relaxed text-slate-500">{body}</p>
-        </div>
-        <button onClick={onClose} className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-black/5 active:bg-black/10 mt-0.5">
-          <X className="w-3 h-3 text-slate-400" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ContributorTooltip({ isContributor, onClose }: { isContributor: boolean; onClose: () => void }) {
-  return (
-    <div
-      className="mt-2.5 rounded-2xl p-3.5"
-      style={{
-        background: isContributor ? "#EFF6FF" : "#F8FAFC",
-        border: `1px solid ${isContributor ? "#3B82F622" : "#94A3B822"}`,
-        animation: "noti-drop 0.18s ease both",
-      }}
-    >
-      <div className="flex items-start gap-2.5">
-        <span className="text-[18px] leading-none shrink-0 mt-0.5">{isContributor ? "🎯" : "📋"}</span>
-        <div className="flex-1 min-w-0">
-          <p className="text-[12px] font-black mb-1" style={{ color: isContributor ? "#3B82F6" : "#94A3B8" }}>
-            {isContributor ? "기여자예요" : "비기여자예요"}
-          </p>
-          <p className="text-[11px] leading-relaxed text-slate-500">
-            {isContributor
-              ? "챌린지 시작 후 일정 기간 이내에 참여해 크루 달성률 계산에 포함돼요. 인증할수록 크루 달성률이 올라가요."
-              : "챌린지가 많이 진행된 후 참여해 크루 달성률 계산에 포함되지 않아요. 인증은 계속 할 수 있어요."}
-          </p>
-        </div>
-        <button onClick={onClose} className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-black/5 active:bg-black/10 mt-0.5">
-          <X className="w-3 h-3 text-slate-400" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ExitDeadlineCountdown({ deadline }: { deadline: string }) {
-  const [remaining, setRemaining] = useState("");
-
-  useEffect(() => {
-    function update() {
-      const ms = new Date(deadline).getTime() - Date.now();
-      if (ms <= 0) { setRemaining("만료"); return; }
-      const h = Math.floor(ms / 3600000);
-      const m = Math.floor((ms % 3600000) / 60000);
-      setRemaining(h > 0 ? `${h}시간 ${m}분 남음` : `${m}분 남음`);
-    }
-    update();
-    const t = setInterval(update, 30000);
-    return () => clearInterval(t);
-  }, [deadline]);
-
-  return (
-    <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-50">
-      <span className="text-[11px] font-black text-red-500">⏰ {remaining}</span>
     </div>
   );
 }

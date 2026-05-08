@@ -52,6 +52,8 @@ let homeMountedOnce = false;
 // FeedViewer 상태 — 유저 프로필 등에서 뒤로가기 시 복원
 let savedFeedViewerOpen = false;
 let savedFeedViewerIdx  = 0;
+// 종료 확인된 그룹 — 홈 카드에서 숨김 (세션 내 유지)
+const dismissedEndedGroupIds = new Set<string>();
 
 interface FeedItem {
   id: string;
@@ -76,7 +78,8 @@ export function Home() {
   const navigate = useNavigate();
   const { nickname, beginVerification, groups, groupsLoading, groupsLoadError, selectedGroupId, setSelectedGroupId, notifications, latestNotification } = useApp();
   const { user } = useAuth();
-  const myGroups = groups.filter(g => g.joined);
+  const [dismissedTick, setDismissedTick] = useState(0);
+  const myGroups = groups.filter(g => g.joined && !dismissedEndedGroupIds.has(g.id));
 
   // 뒤로가기 복귀 시 채팅 캐시에서 초기화 (빈 화면 방지)
   const initGroupDbId = (myGroups.find(g => g.id === selectedGroupId) ?? myGroups[0])?.dbId;
@@ -556,6 +559,7 @@ export function Home() {
     <div className="flex flex-col flex-1 overflow-hidden bg-white relative">
       <style>{`
         @keyframes hm-in     { from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);} }
+        @keyframes sheet-up  { from{transform:translateY(100%);}to{transform:translateY(0);} }
         @keyframes picker-in { from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);} }
         @keyframes btn-flash { 0%{opacity:1} 30%{opacity:0.6;transform:scale(0.98)} 60%{opacity:1;transform:scale(1.01)} 100%{opacity:1;transform:scale(1)} }
         @keyframes notif-drop {
@@ -673,7 +677,10 @@ export function Home() {
               ) : isChallengeEnded ? (
               <div
                 className="absolute inset-0 overflow-hidden cursor-pointer"
-                onClick={() => navigate(`/challenge/group/${selectedGroupId}/result`)}
+                onClick={() => {
+                  if (selectedGroup) { dismissedEndedGroupIds.add(selectedGroup.id); setDismissedTick(t => t + 1); }
+                  navigate(`/challenge/group/${selectedGroupId}/result`);
+                }}
               >
                 <img
                   src={selectedGroup?.cover}
@@ -1205,38 +1212,56 @@ export function Home() {
 
         </div>{/* px-4 끝 */}
 
-        {/* 인증하기 버튼 */}
+        {/* 인증하기 / 확인하기 버튼 */}
         <div className="px-4 pb-3 pt-2 shrink-0">
-          <button
-            onClick={() => guardAction(() => {
-              if (selectedGroup) {
-                const vType = selectedGroup.verifyType as VerifyTypeKey;
-                beginVerification({ verifyType: vType, groupId: selectedGroup.dbId ?? null });
-                navigate(`/verify/guide/${vType}`);
-              } else {
-                navigate("/challenge");
-              }
-            })}
-            className="relative w-full h-[68px] rounded-[20px] flex items-center px-5 gap-4 text-white active:scale-[0.97] transition-all duration-200 overflow-hidden"
-            style={{ background: "linear-gradient(115deg, #FF5C7A 0%, #FF3355 45%, #C8002B 100%)", boxShadow: "0 8px 24px rgba(255,51,85,0.22), 0 1px 0 rgba(255,255,255,0.12) inset", animation: btnFlash ? "btn-flash 0.6s cubic-bezier(0.4,0,0.2,1) both" : undefined }}>
-            {/* 배경 광택 원 */}
-            {/* 카메라 아이콘 */}
-            <div className="shrink-0 w-10 h-10 rounded-[14px] flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(4px)", border: "1px solid rgba(255,255,255,0.2)" }}>
-              <Camera className="w-5 h-5 text-white" strokeWidth={2} />
-            </div>
-            {/* 텍스트 */}
-            <div className="flex flex-col gap-0.5 flex-1">
-              <span className="font-black text-[16px] leading-none tracking-tight">오늘 인증하기</span>
-              <span className="text-white/55 text-[12px] font-medium leading-none truncate">
-                {selectedGroup
-                  ? `${VERIFY_TYPES[(selectedGroup.verifyType as VerifyTypeKey) ?? "step_walk"]?.emoji} ${selectedGroup.goal}`
-                  : "챌린지에 참여하고 인증해보세요"}
-              </span>
-            </div>
-            {/* 화살표 */}
-            <ChevronRight className="w-5 h-5 text-white/40 shrink-0" strokeWidth={2.5} />
-          </button>
+          {isChallengeEnded ? (
+            <button
+              onClick={() => {
+                if (selectedGroup) { dismissedEndedGroupIds.add(selectedGroup.id); setDismissedTick(t => t + 1); }
+                navigate(`/challenge/group/${selectedGroupId}/result`);
+              }}
+              className="relative w-full h-[68px] rounded-[20px] flex items-center px-5 gap-4 text-white active:scale-[0.97] transition-all duration-200 overflow-hidden"
+              style={{ background: "linear-gradient(115deg,#64748B,#475569)", boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
+              <div className="shrink-0 w-10 h-10 rounded-[14px] flex items-center justify-center"
+                style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(4px)", border: "1px solid rgba(255,255,255,0.2)" }}>
+                <span className="text-[18px] leading-none">🏁</span>
+              </div>
+              <div className="flex flex-col gap-0.5 flex-1">
+                <span className="font-black text-[16px] leading-none tracking-tight">확인하기</span>
+                <span className="text-white/55 text-[12px] font-medium leading-none truncate">
+                  {selectedGroup?.title} · 챌린지 종료
+                </span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-white/40 shrink-0" strokeWidth={2.5} />
+            </button>
+          ) : (
+            <button
+              onClick={() => guardAction(() => {
+                if (selectedGroup) {
+                  const vType = selectedGroup.verifyType as VerifyTypeKey;
+                  beginVerification({ verifyType: vType, groupId: selectedGroup.dbId ?? null });
+                  navigate(`/verify/guide/${vType}`);
+                } else {
+                  navigate("/challenge");
+                }
+              })}
+              className="relative w-full h-[68px] rounded-[20px] flex items-center px-5 gap-4 text-white active:scale-[0.97] transition-all duration-200 overflow-hidden"
+              style={{ background: "linear-gradient(115deg, #FF5C7A 0%, #FF3355 45%, #C8002B 100%)", boxShadow: "0 8px 24px rgba(255,51,85,0.22), 0 1px 0 rgba(255,255,255,0.12) inset", animation: btnFlash ? "btn-flash 0.6s cubic-bezier(0.4,0,0.2,1) both" : undefined }}>
+              <div className="shrink-0 w-10 h-10 rounded-[14px] flex items-center justify-center"
+                style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(4px)", border: "1px solid rgba(255,255,255,0.2)" }}>
+                <Camera className="w-5 h-5 text-white" strokeWidth={2} />
+              </div>
+              <div className="flex flex-col gap-0.5 flex-1">
+                <span className="font-black text-[16px] leading-none tracking-tight">오늘 인증하기</span>
+                <span className="text-white/55 text-[12px] font-medium leading-none truncate">
+                  {selectedGroup
+                    ? `${VERIFY_TYPES[(selectedGroup.verifyType as VerifyTypeKey) ?? "step_walk"]?.emoji} ${selectedGroup.goal}`
+                    : "챌린지에 참여하고 인증해보세요"}
+                </span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-white/40 shrink-0" strokeWidth={2.5} />
+            </button>
+          )}
         </div>
 
         {/* ── 실시간 인증 피드 ── */}
@@ -1300,6 +1325,7 @@ export function Home() {
           onClose={() => { savedFeedViewerOpen = false; setFeedViewerOpen(false); }}
         />
       )}
+
     </div>
   );
 }

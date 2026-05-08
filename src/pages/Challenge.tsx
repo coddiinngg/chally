@@ -15,6 +15,15 @@ function fmtDate(d: string): string {
   return `${dt.getMonth() + 1}/${dt.getDate()}`;
 }
 
+function sortPriority(g: Group): number {
+  if (g.isRemoved) return 4;                                                          // 최하단: 퇴장
+  const phase = getPhase(g.challengeStart, g.challengeEnd, g.recruitEnd);
+  if (phase === "ended") return 3;                                                     // 그 위: 종료됨
+  if (g.joined) return 0;                                                              // 최상단: 참여중
+  if (phase === "active" || phase === "closing") return 1;                             // 진행중 미참여
+  return 2;                                                                            // 모집중
+}
+
 // 진행중 챌린지 자동 스크롤 티커
 function LiveTicker({ items }: { items: Group[] }) {
   const ref1 = useRef<HTMLDivElement>(null);
@@ -157,7 +166,7 @@ export function Challenge() {
     .filter((g) => filterMode === "전체" || g.joined)
     .filter((g) => activeCat === "전체" || g.category === activeCat)
     .filter((g) => !searchQuery || g.title.includes(searchQuery) || g.desc.includes(searchQuery))
-    .sort((a, b) => Number(b.joined) - Number(a.joined)); // 참여 중인 그룹 먼저
+    .sort((a, b) => sortPriority(a) - sortPriority(b));
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-[#F8F8FA]" onClick={() => setShowDropdown(false)}>
