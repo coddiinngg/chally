@@ -1,11 +1,84 @@
 import { Search, Users, ChevronDown,
          Activity, BookOpen, Apple, Sparkles } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 import React, { useState, useEffect } from "react";
 import { useApp } from "../contexts/AppContext";
 import { useGuestGuard } from "../contexts/GuestGuardContext";
 import { getPhase, shouldHide, canJoin, phaseLabel, isLateJoiner } from "../lib/challengeUtils";
+import { VERIFY_TYPES, type VerifyTypeKey } from "../lib/verifyTypes";
+import type { Group } from "../contexts/AppContext";
+import { useRef, useLayoutEffect } from "react";
+
+function fmtDate(d: string): string {
+  const dt = new Date(d);
+  return `${dt.getMonth() + 1}/${dt.getDate()}`;
+}
+
+// 진행중 챌린지 자동 스크롤 티커
+function LiveTicker({ items }: { items: Group[] }) {
+  const ref1 = useRef<HTMLDivElement>(null);
+  const [dur, setDur] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!ref1.current) return;
+    // 단일 복사본 너비 측정 (전체 scrollWidth의 절반)
+    const w = ref1.current.scrollWidth / 2;
+    if (w > 0) setDur(w / 45); // 45 px/s — 뉴스 티커 표준 속도
+  }, [items.length]);
+
+  if (items.length === 0) return null;
+
+  function Chip({ g }: { g: Group; key?: React.Key }) {
+    const emoji = VERIFY_TYPES[(g.verifyType as VerifyTypeKey)]?.emoji ?? "🏃";
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full shrink-0"
+        style={{ background: "rgba(255,51,85,0.06)", border: "1px solid rgba(255,51,85,0.13)" }}>
+        <span className="text-[10px] leading-none">{emoji}</span>
+        <span className="text-[10px] font-semibold text-slate-500 leading-none whitespace-nowrap">{g.title}</span>
+      </span>
+    );
+  }
+
+  // 구분자 — 그룹 사이 시각적 리듬
+  function Sep() {
+    return <span className="text-[8px] text-slate-300 leading-none shrink-0 self-center">●</span>;
+  }
+
+  // [A · B · C · A · B · C] 형태로 구성
+  const withSeps = (list: Group[], suffix: string) =>
+    list.flatMap((g, i) => [
+      <Chip key={`${g.id}${suffix}`} g={g} />,
+      <Sep key={`sep${suffix}${i}`} />,
+    ]);
+
+  const anim1 = dur > 0 ? `ticker-l ${dur.toFixed(1)}s linear infinite` : "none";
+  // 2행: 같은 duration, 절반 지점에서 시작 (음수 delay = 미리 앞서 시작)
+  const anim2 = dur > 0 ? `ticker-l ${dur.toFixed(1)}s linear -${(dur / 2).toFixed(1)}s infinite` : "none";
+
+  return (
+    <div className="overflow-hidden py-2 flex flex-col gap-1.5"
+      style={{ borderTop: "1px solid rgba(0,0,0,0.05)", background: "rgba(255,255,255,0.85)" }}>
+      <style>{`@keyframes ticker-l{from{transform:translateX(0)}to{transform:translateX(-50%)}}`}</style>
+
+      {/* 1행 */}
+      <div className="overflow-hidden">
+        <div ref={ref1} className="flex items-center gap-2 w-max" style={{ animation: anim1 }}>
+          {withSeps(items, "-a")}
+          {withSeps(items, "-b")}
+        </div>
+      </div>
+
+      {/* 2행: 동일 속도, 절반 오프셋 → 두 행이 자연스럽게 엇갈림 */}
+      <div className="overflow-hidden">
+        <div className="flex items-center gap-2 w-max" style={{ animation: anim2 }}>
+          {withSeps(items, "-c")}
+          {withSeps(items, "-d")}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // 카테고리 아이콘 + 배경
 const CAT_META: Record<string, { icon: React.ElementType; bg: string; color: string; glow: string; grad: string; cardGrad: string; iconColor: string }> = {
@@ -38,6 +111,7 @@ function CatTag({ category }: { category: string }) {
 
 export function Challenge() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { groups, joinGroup, leaveGroup, setSelectedGroupId } = useApp();
   const { guardAction } = useGuestGuard();
   const [activeCat, setActiveCat] = useState("전체");
@@ -48,11 +122,25 @@ export function Challenge() {
   const [mounted,   setMounted]   = useState(false);
   const [joinTarget, setJoinTarget] = useState<{ id: string; title: string; desc: string; members: number; challengeStart: string | null; challengeEnd: string | null } | null>(null);
   const [leaveTarget, setLeaveTarget] = useState<{ id: string; title: string } | null>(null);
+  const [removedToast, setRemovedToast] = useState(!!(location.state as { removedGroupId?: string } | null)?.removedGroupId);
+
+  // 진행중이지만 미참여(퇴장 포함 아님) 그룹 → 티커용
+  const liveUnjoined = groups.filter(g => {
+    if (g.joined || g.isRemoved) return false;
+    const phase = getPhase(g.challengeStart, g.challengeEnd, g.recruitEnd);
+    return phase === "active" || phase === "closing";
+  });
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    if (!removedToast) return;
+    const t = setTimeout(() => setRemovedToast(false), 4000);
+    return () => clearTimeout(t);
+  }, [removedToast]);
 
   const slide = (delay: number): React.CSSProperties => ({
     opacity: mounted ? 1 : 0,
@@ -77,7 +165,27 @@ export function Challenge() {
         @keyframes ch-down  { from{opacity:0;transform:translateY(-12px);}to{opacity:1;transform:translateY(0);} }
         @keyframes ch-scale { from{opacity:0;transform:scale(0.96);}to{opacity:1;transform:scale(1);} }
         @keyframes ch-sheet { from{transform:translateY(100%);}to{transform:translateY(0);} }
+        @keyframes ch-toast { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
       `}</style>
+
+      {/* 퇴장 안내 토스트 */}
+      {removedToast && (
+        <div
+          className="fixed bottom-24 left-4 right-4 z-[300] flex items-center gap-3 px-4 py-3 rounded-2xl"
+          style={{
+            background: "rgba(255,51,85,0.95)",
+            backdropFilter: "blur(16px)",
+            boxShadow: "0 8px 24px rgba(255,51,85,0.35)",
+            animation: "ch-toast 0.3s cubic-bezier(0.34,1.56,0.64,1) both",
+          }}
+        >
+          <span className="text-[18px] leading-none shrink-0">🚪</span>
+          <div>
+            <p className="text-white font-black text-[13px] leading-tight">그룹에서 퇴장됐어요</p>
+            <p className="text-white/75 text-[11px] mt-0.5">72시간 미인증으로 인해 자동 퇴장 처리됐어요.</p>
+          </div>
+        </div>
+      )}
 
       {/* 헤더 */}
       <div
@@ -202,6 +310,11 @@ export function Challenge() {
           </div>
         </div>
 
+        {/* 라이브 티커 — 진행중이지만 미참여 그룹 */}
+        <div className="px-4 pt-2 pb-0">
+          <LiveTicker items={liveUnjoined} />
+        </div>
+
         {/* 전체 그룹 리스트 */}
         <div className="px-4 pt-3 pb-6 space-y-2.5">
           {filtered.map((g, i) => {
@@ -215,9 +328,12 @@ export function Challenge() {
             return (
               <div
                 key={id}
-                className="bg-white rounded-2xl border border-black/[0.04] overflow-hidden active:scale-[0.99] transition-all duration-150 cursor-pointer"
+                className={cn(
+                  "bg-white rounded-2xl border border-black/[0.04] overflow-hidden transition-all duration-150",
+                  g.isRemoved ? "opacity-50 cursor-default" : "active:scale-[0.99] cursor-pointer"
+                )}
                 style={{ ...slide(i * 55 + 200), boxShadow: "0 2px 8px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)" }}
-                onClick={() => navigate(`/challenge/group/${id}`)}
+                onClick={() => { if (!g.isRemoved) navigate(`/challenge/group/${id}`); }}
               >
                 <div className="block p-4 pb-3">
                   {/* 상단: 카테고리 + 상태 + 참여중 */}
@@ -253,10 +369,17 @@ export function Challenge() {
                     <span className={cn("text-[14px] font-black shrink-0 tabular-nums w-10 text-right", isEnded ? "text-slate-300" : "text-[#FF3355]")}>{crewRate}%</span>
                   </div>
 
-                  {/* 멤버 수 */}
-                  <div className="flex items-center gap-1 text-slate-400">
-                    <Users className="w-3.5 h-3.5" />
-                    <span className="text-[12px]">{members}명 참여 중</span>
+                  {/* 멤버 수 + 챌린지 기간 */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1 text-slate-400">
+                      <Users className="w-3.5 h-3.5" />
+                      <span className="text-[12px]">{members}명 참여 중</span>
+                    </div>
+                    {g.challengeStart && g.challengeEnd && (
+                      <span className="text-[11px] text-slate-300 font-medium">
+                        {fmtDate(g.challengeStart)} ~ {fmtDate(g.challengeEnd)}
+                      </span>
+                    )}
                   </div>
 
                   {/* 저조한 크루 경고 (39% 이하) */}
@@ -276,6 +399,10 @@ export function Challenge() {
                     >
                       참여 중 · 탈퇴
                     </button>
+                  ) : g.isRemoved ? (
+                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-300 text-center">
+                      🚪 퇴장된 그룹
+                    </div>
                   ) : joinable ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); guardAction(() => setJoinTarget({ id, title, desc, members, challengeStart: g.challengeStart, challengeEnd: g.challengeEnd })); }}

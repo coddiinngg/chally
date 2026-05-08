@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, type ChangeEvent } from "react";
-import { ChevronLeft, Image as ImageIcon, Sparkles, BookOpen } from "lucide-react";
+import { X, Image as ImageIcon, Sparkles, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../../lib/verifyTypes";
@@ -150,11 +150,11 @@ export function Camera() {
       <div className="relative z-10 flex items-center justify-between px-4 pt-5 pb-3"
         style={{ animation: mounted ? "cam-in 0.35s ease both" : "none" }}>
 
-        {/* 뒤로 */}
-        <button onClick={() => navigate(-1)}
+        {/* 닫기 */}
+        <button onClick={() => navigate("/")}
           className="w-10 h-10 flex items-center justify-center rounded-full active:opacity-60 transition-opacity"
           style={{ background: btnBg, backdropFilter: "blur(8px)", border: `1px solid ${btnBorder}` }}>
-          <ChevronLeft className="w-5 h-5" style={{ color: iconColor }} />
+          <X className="w-4 h-4" style={{ color: iconColor }} />
         </button>
 
         {/* 중앙 타입 pill */}

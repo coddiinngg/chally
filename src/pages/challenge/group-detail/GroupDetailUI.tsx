@@ -8,6 +8,15 @@ import { supabase } from "../../../lib/supabase";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../../../lib/verifyTypes";
 import { formatActivityTime, loadActivityFeed, type ActivityFeedItem } from "../../../lib/activity";
 import { getPhase, getBenefitGrade } from "../../../lib/challengeUtils";
+
+function fmtPeriod(start: string | null, end: string | null): string | null {
+  if (!start || !end) return null;
+  const fmt = (d: string) => {
+    const dt = new Date(d);
+    return `${dt.getFullYear()}.${String(dt.getMonth() + 1).padStart(2, "0")}.${String(dt.getDate()).padStart(2, "0")}`;
+  };
+  return `${fmt(start)} ~ ${fmt(end)}`;
+}
 import { loadGroupLeaderboard, type LeaderboardItem } from "../../../lib/leaderboard";
 
 interface CrewStatus {
@@ -46,7 +55,7 @@ const gradeColor = (g: string) =>
 export function GroupDetailUI() {
   const navigate = useNavigate();
   const { groupId = "1" } = useParams<{ groupId: string }>();
-  const { groups, groupsLoading, joinGroup, leaveGroup, beginVerification, verificationHistory } = useApp();
+  const { groups, groupsLoading, joinGroup, leaveGroup, markGroupLeft, beginVerification, verificationHistory } = useApp();
   const { user } = useAuth();
   const { state: locState } = useLocation() as { state: { tab?: "leaderboard" | "activity" | "gallery"; skipAnimation?: boolean; fromActivityPhoto?: boolean } | null };
 
@@ -70,6 +79,7 @@ export function GroupDetailUI() {
   const [showStartBanner, setShowStartBanner]   = useState(false);
   const [showLowRateAlert, setShowLowRateAlert] = useState(false);
   const [showLeave72h, setShowLeave72h]         = useState(false);
+  const [statusTooltip, setStatusTooltip]       = useState<"status" | "contributor" | null>(null);
   const scrollRef                               = useRef<HTMLDivElement>(null);
   const tabBarRef                               = useRef<HTMLDivElement>(null);
   const scrollKey                               = `gd-scroll-${groupId}`;
@@ -208,7 +218,12 @@ export function GroupDetailUI() {
       const { data, error } = await supabase.rpc("get_crew_status", { p_group_id: groupDbId });
       if (cancelled) return;
       if (error || !data?.length) { setCrewStatus(null); return; }
-      setCrewStatus(data[0] as CrewStatus);
+      const status = data[0] as CrewStatus;
+      setCrewStatus(status);
+      if (status.my_status === "REMOVED") {
+        markGroupLeft(groupDbId);
+        navigate("/challenge", { replace: true, state: { removedGroupId: groupDbId } });
+      }
     }
     void loadCrewStatus();
     return () => { cancelled = true; };
@@ -365,6 +380,11 @@ export function GroupDetailUI() {
             </div>
             <h2 className="text-[28px] font-black text-white tracking-tight leading-tight">{group.title}</h2>
             <p className="text-white/75 mt-1.5 text-[13px] leading-relaxed">{group.desc}</p>
+            {fmtPeriod(group.challengeStart, group.challengeEnd) && (
+              <p className="text-white/45 mt-2 text-[11px] font-semibold">
+                📅 {fmtPeriod(group.challengeStart, group.challengeEnd)}
+              </p>
+            )}
           </div>
         </section>
 
@@ -535,12 +555,15 @@ export function GroupDetailUI() {
                   <p className="text-[11px] font-black text-slate-400 mb-2.5">내 크루 상태</p>
                   <div className="flex items-center gap-2.5 flex-wrap">
                     {/* 멤버 상태 pill */}
-                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl"
+                    <button
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl active:opacity-75 transition-opacity"
                       style={{
                         background: crewStatus.my_status === "ACTIVE" ? "#ECFDF5"
                           : crewStatus.my_status === "EXIT_ELIGIBLE" ? "#FFFBEB"
                           : "#FFF1F2",
-                      }}>
+                      }}
+                      onClick={() => setStatusTooltip(v => v === "status" ? null : "status")}
+                    >
                       {crewStatus.my_status === "ACTIVE"
                         ? <ShieldCheck className="w-3.5 h-3.5" style={{ color: "#10B981" }} />
                         : crewStatus.my_status === "EXIT_ELIGIBLE"
@@ -554,23 +577,40 @@ export function GroupDetailUI() {
                             : "#FF3355",
                         }}>
                         {crewStatus.my_status === "ACTIVE" ? "활성"
-                          : crewStatus.my_status === "EXIT_ELIGIBLE" ? "퇴장 예정"
+                          : crewStatus.my_status === "EXIT_ELIGIBLE" ? "퇴장경고"
                           : "퇴장됨"}
                       </span>
-                    </div>
+                    </button>
                     {/* 기여자 여부 */}
-                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl"
-                      style={{ background: crewStatus.my_is_contributor ? "#EFF6FF" : "#F8FAFC" }}>
+                    <button
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl active:opacity-75 transition-opacity"
+                      style={{ background: crewStatus.my_is_contributor ? "#EFF6FF" : "#F8FAFC" }}
+                      onClick={() => setStatusTooltip(v => v === "contributor" ? null : "contributor")}
+                    >
                       <span className="text-[11px] font-black"
                         style={{ color: crewStatus.my_is_contributor ? "#3B82F6" : "#94A3B8" }}>
                         {crewStatus.my_is_contributor ? "🎯 기여자" : "비기여자"}
                       </span>
-                    </div>
+                    </button>
                     {/* 퇴장 유예 시 남은 시간 */}
                     {crewStatus.my_status === "EXIT_ELIGIBLE" && crewStatus.my_exit_deadline && (
                       <ExitDeadlineCountdown deadline={crewStatus.my_exit_deadline} />
                     )}
                   </div>
+
+                  {/* 상태 설명 툴팁 */}
+                  {statusTooltip === "status" && (
+                    <StatusTooltip
+                      status={crewStatus.my_status}
+                      onClose={() => setStatusTooltip(null)}
+                    />
+                  )}
+                  {statusTooltip === "contributor" && (
+                    <ContributorTooltip
+                      isContributor={crewStatus.my_is_contributor}
+                      onClose={() => setStatusTooltip(null)}
+                    />
+                  )}
                   {/* 크루 전체 통계 */}
                   <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-50">
                     <div className="flex-1 text-center">
@@ -907,7 +947,17 @@ export function GroupDetailUI() {
 
       {/* ── FAB: 단일 주요 액션 ── */}
       <div className="shrink-0 px-4 pb-8 pt-3 bg-[#F2F2F7] border-t border-black/[0.04]">
-        {group.joined ? (
+        {phase === "ended" ? (
+          <div className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-slate-100 border border-black/[0.06]">
+            <span className="text-[15px]">🏁</span>
+            <span className="text-[15px] font-black text-slate-400">챌린지가 종료됐어요</span>
+          </div>
+        ) : crewStatus?.my_status === "REMOVED" ? (
+          <div className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-slate-100 border border-black/[0.06]">
+            <span className="text-[15px]">🚪</span>
+            <span className="text-[15px] font-black text-slate-400">퇴장된 그룹이에요</span>
+          </div>
+        ) : group.joined ? (
           <button
             onClick={startVerification}
             className="w-full h-14 flex items-center justify-center gap-2.5 rounded-2xl text-white font-black text-[16px] active:scale-[0.98] transition-transform"
@@ -1111,6 +1161,69 @@ export function GroupDetailUI() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function StatusTooltip({ status, onClose }: { status: string | null; onClose: () => void }) {
+  const isActive       = status === "ACTIVE";
+  const isEligible     = status === "EXIT_ELIGIBLE";
+
+  const icon  = isActive ? "✅" : isEligible ? "⏰" : "🚫";
+  const title = isActive ? "활성 상태예요" : isEligible ? "퇴장경고 상태예요" : "퇴장된 상태예요";
+  const body  = isActive
+    ? "정상적으로 챌린지에 참여 중이에요. 48시간 이상 인증을 하지 않으면 '퇴장경고' 상태가 돼요."
+    : isEligible
+    ? "48시간 동안 인증하지 않았어요. 마지막 인증으로부터 72시간이 지나면 자동으로 퇴장됩니다."
+    : "인증 없이 유예 기간이 지나 크루에서 퇴장됐어요. 챌린지 달성률 집계에서 제외됩니다.";
+  const color = isActive ? "#059669" : isEligible ? "#D97706" : "#FF3355";
+  const bg    = isActive ? "#ECFDF5" : isEligible ? "#FFFBEB" : "#FFF1F2";
+
+  return (
+    <div
+      className="mt-2.5 rounded-2xl p-3.5"
+      style={{ background: bg, border: `1px solid ${color}22`, animation: "noti-drop 0.18s ease both" }}
+    >
+      <div className="flex items-start gap-2.5">
+        <span className="text-[18px] leading-none shrink-0 mt-0.5">{icon}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-[12px] font-black mb-1" style={{ color }}>{title}</p>
+          <p className="text-[11px] leading-relaxed text-slate-500">{body}</p>
+        </div>
+        <button onClick={onClose} className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-black/5 active:bg-black/10 mt-0.5">
+          <X className="w-3 h-3 text-slate-400" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ContributorTooltip({ isContributor, onClose }: { isContributor: boolean; onClose: () => void }) {
+  return (
+    <div
+      className="mt-2.5 rounded-2xl p-3.5"
+      style={{
+        background: isContributor ? "#EFF6FF" : "#F8FAFC",
+        border: `1px solid ${isContributor ? "#3B82F622" : "#94A3B822"}`,
+        animation: "noti-drop 0.18s ease both",
+      }}
+    >
+      <div className="flex items-start gap-2.5">
+        <span className="text-[18px] leading-none shrink-0 mt-0.5">{isContributor ? "🎯" : "📋"}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-[12px] font-black mb-1" style={{ color: isContributor ? "#3B82F6" : "#94A3B8" }}>
+            {isContributor ? "기여자예요" : "비기여자예요"}
+          </p>
+          <p className="text-[11px] leading-relaxed text-slate-500">
+            {isContributor
+              ? "챌린지 시작 후 일정 기간 이내에 참여해 크루 달성률 계산에 포함돼요. 인증할수록 크루 달성률이 올라가요."
+              : "챌린지가 많이 진행된 후 참여해 크루 달성률 계산에 포함되지 않아요. 인증은 계속 할 수 있어요."}
+          </p>
+        </div>
+        <button onClick={onClose} className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-black/5 active:bg-black/10 mt-0.5">
+          <X className="w-3 h-3 text-slate-400" />
+        </button>
+      </div>
     </div>
   );
 }

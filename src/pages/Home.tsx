@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react";
-import { Bell, BellRing, Camera, Flame, Send, Crown, ChevronRight, Zap, Lightbulb, SmilePlus, Trophy, ArrowRight } from "lucide-react";
+import { Bell, BellRing, Camera, Flame, Send, Crown, ChevronRight, Zap, Lightbulb, SmilePlus, Trophy, ArrowRight, X, ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../lib/verifyTypes";
 import { useGuestGuard } from "../contexts/GuestGuardContext";
-import { formatActivityTime, loadActivityFeed, reactionCache, type ActivityFeedItem } from "../lib/activity";
+import { formatActivityTime, loadActivityFeed, reactionCache, type ActivityFeedItem, type ActivityEmoji } from "../lib/activity";
 import { loadGroupLeaderboard, type LeaderboardItem } from "../lib/leaderboard";
 import { formatChatTime, loadGroupMessages, type GroupChatMessage, type MessageEmoji } from "../lib/chat";
 import { supabase } from "../lib/supabase";
@@ -49,6 +49,9 @@ type ChatCacheEntry = { messages: ChatMsg[]; reactions: Record<string, MessageEm
 let chatMessagesCache: Record<string, ChatCacheEntry> = {};
 // 최초 마운트 여부 — 헤더 진입 애니메이션 재생 방지
 let homeMountedOnce = false;
+// FeedViewer 상태 — 유저 프로필 등에서 뒤로가기 시 복원
+let savedFeedViewerOpen = false;
+let savedFeedViewerIdx  = 0;
 
 interface FeedItem {
   id: string;
@@ -96,6 +99,8 @@ export function Home() {
   const [lastReadMsgId, setLastReadMsgId]   = useState<string | null>(null);
   const [, setUnreadTick]                   = useState(0);
   const [chatSendError, setChatSendError]   = useState(false);
+  const [feedViewerOpen, setFeedViewerOpen]   = useState(savedFeedViewerOpen);
+  const [feedViewerIdx, setFeedViewerIdx]     = useState(savedFeedViewerIdx);
   const chatSendErrTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [inAppToasts, setInAppToasts]       = useState<InAppToastItem[]>([]);
   const toastTimers                         = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -158,7 +163,7 @@ export function Home() {
   // 서버 알림 도착 → 인앱 토스트 (챌린지 관련 타입만)
   useEffect(() => {
     if (!latestNotification) return;
-    if (!["group", "streak", "rank"].includes(latestNotification.type)) return;
+    if (!["group", "streak", "rank", "member_warning", "member_removed"].includes(latestNotification.type)) return;
     showInAppToast(latestNotification.emoji ?? "🔔", latestNotification.body);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestNotification?.id]);
@@ -168,7 +173,7 @@ export function Home() {
     let cancelled = false;
     async function loadHomeFeed() {
       try {
-        const posts = await loadActivityFeed({ userId: user?.id ?? null, limit: 8 });
+        const posts = await loadActivityFeed({ userId: user?.id ?? null, limit: 20 });
         if (!cancelled) { setActivityFeed(posts); feedCache = posts; }
       } catch (error) {
         console.error("Failed to load home activity feed", error);
@@ -1259,102 +1264,240 @@ export function Home() {
             )}
           </div>
 
-          {/* 벤토 비대칭 그리드 */}
+          {/* 2열 × 10행 정사각형 세로 그리드 */}
           {recentFeed.length === 0 ? (
-            <div className="min-h-[180px] rounded-2xl bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-2 text-center px-6">
-              <span className="text-4xl">📸</span>
-              <p className="text-slate-700 font-black text-[15px]">아직 인증 피드가 없어요</p>
-              <p className="text-slate-400 text-[12px]">그룹 인증이 완료되면 여기에 표시돼요</p>
+            <div className="grid grid-cols-2 gap-2">
+              {Array.from({ length: 20 }, (_, i) => (
+                <div key={i} className="aspect-square rounded-2xl bg-slate-100 animate-pulse" />
+              ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2.5">
-              {/* 왼쪽 컬럼 */}
-              <div className="flex flex-col gap-2.5">
-                {recentFeed.filter((_, i) => i % 2 === 0).map((item) => (
-                  <FeedCard key={item.id} item={item} />
-                ))}
-              </div>
-              {/* 오른쪽 컬럼 — 위로 오프셋 */}
-              <div className="flex flex-col gap-2.5 mt-6">
-                {recentFeed.filter((_, i) => i % 2 === 1).map((item) => (
-                  <FeedCard key={item.id} item={item} />
-                ))}
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              {Array.from({ length: 20 }, (_, idx) => {
+                const item = recentFeed[idx];
+                return item ? (
+                  <FeedCard
+                    key={item.id}
+                    item={item}
+                    onTap={() => { savedFeedViewerIdx = idx; savedFeedViewerOpen = true; setFeedViewerIdx(idx); setFeedViewerOpen(true); }}
+                  />
+                ) : (
+                  <div key={`empty-${idx}`} className="aspect-square rounded-2xl bg-slate-100" />
+                );
+              })}
             </div>
           )}
         </div>
 
       </div>
 
+      {/* ── 피드 뷰어 오버레이 ── */}
+      {feedViewerOpen && (
+        <FeedViewer
+          items={recentFeed}
+          startIdx={feedViewerIdx}
+          userId={user?.id ?? null}
+          onClose={() => { savedFeedViewerOpen = false; setFeedViewerOpen(false); }}
+        />
+      )}
     </div>
   );
 }
 
-function FeedCard({ item }: { item: FeedItem; key?: React.Key }) {
-  const navigate = useNavigate();
+function FeedCard({ item, onTap }: { item: FeedItem; onTap: () => void; key?: React.Key }) {
+  return (
+    <div
+      className="aspect-square rounded-2xl overflow-hidden shadow-sm active:scale-[0.97] transition-transform cursor-pointer border border-black/[0.04] relative"
+      onClick={onTap}
+    >
+      {item.img ? (
+        <img
+          src={item.img}
+          alt={item.caption}
+          className="w-full h-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-[#FF3355] to-[#FF6680]" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
+      <div className="absolute top-1.5 right-1.5 bg-black/30 backdrop-blur-sm px-1 py-0.5 rounded-full">
+        <span className="text-[9px]">{item.verifyEmoji}</span>
+      </div>
+      <div className="absolute bottom-0 left-0 right-0 px-2 pb-2">
+        <img
+          src={item.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`}
+          alt={item.user}
+          className="w-4 h-4 rounded-full bg-white/20 object-cover mb-0.5"
+        />
+        <p className="text-white text-[9px] font-black truncate leading-none">{item.user}</p>
+      </div>
+    </div>
+  );
+}
 
-  function goToPhoto() {
-    const cached = item.postId ? reactionCache.get(item.postId) : null;
-    navigate("/challenge/group/feed/activity", {
-      state: {
-        imgSrc: item.img,
-        postId: item.postId,
-        userId: item.seed,
-        grad: ["#FF3355", "#FF6680"] as [string, string],
-        name: item.user,
-        seed: item.seed,
-        time: item.time,
-        msg: item.caption,
-        type: "verify",
-        reactionCount: cached?.count ?? item.reactionCount,
-        myReaction: cached?.myReaction ?? item.myReaction,
-        avatarUrl: item.avatarUrl,
-      },
+const FEED_REACTIONS: ActivityEmoji[] = ["❤️", "🔥", "👍", "😮", "🎉"];
+
+function FeedViewer({
+  items,
+  startIdx,
+  userId,
+  onClose,
+}: {
+  items: FeedItem[];
+  startIdx: number;
+  userId: string | null;
+  onClose: () => void;
+}) {
+  const navigate = useNavigate();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const itemRefs  = useRef<(HTMLDivElement | null)[]>([]);
+  const [reactionsMap, setReactionsMap] = useState<Record<string, { emoji: ActivityEmoji | null; count: number }>>(() => {
+    const map: Record<string, { emoji: ActivityEmoji | null; count: number }> = {};
+    items.forEach(item => {
+      const id = item.postId ?? item.id;
+      const cached = reactionCache.get(id);
+      map[id] = {
+        emoji: (cached?.myReaction as ActivityEmoji | null) ?? (item.myReaction as ActivityEmoji | null) ?? null,
+        count: cached?.count ?? item.reactionCount ?? 0,
+      };
     });
+    return map;
+  });
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    const target = itemRefs.current[startIdx];
+    if (target) target.scrollIntoView({ block: "start" });
+  }, []);
+
+  async function handleReact(postId: string, emoji: ActivityEmoji) {
+    if (!userId) { navigate("/login"); return; }
+    const prev = reactionsMap[postId] ?? { emoji: null, count: 0 };
+    const isSame = prev.emoji === emoji;
+    const nextEmoji = isSame ? null : emoji;
+    const nextCount = isSame ? Math.max(0, prev.count - 1) : (prev.emoji ? prev.count : prev.count + 1);
+    setReactionsMap(m => ({ ...m, [postId]: { emoji: nextEmoji, count: nextCount } }));
+    reactionCache.set(postId, { count: nextCount, myReaction: nextEmoji });
+    setPickerFor(null);
+
+    const mutation = nextEmoji
+      ? supabase.from("activity_reactions").upsert({ activity_post_id: postId, user_id: userId, emoji: nextEmoji })
+      : supabase.from("activity_reactions").delete().eq("activity_post_id", postId).eq("user_id", userId);
+    const { error } = await mutation;
+    if (error) {
+      setReactionsMap(m => ({ ...m, [postId]: prev }));
+      reactionCache.set(postId, { count: prev.count, myReaction: prev.emoji });
+    }
   }
 
   return (
     <div
-      className="bg-white rounded-2xl overflow-hidden shadow-sm active:scale-[0.97] transition-transform cursor-pointer border border-black/[0.04]"
-      onClick={goToPhoto}
+      className="fixed inset-0 bg-white dark:bg-black"
+      style={{ zIndex: 200, animation: "fv-in 0.2s ease both" }}
+      onClick={() => pickerFor && setPickerFor(null)}
     >
-      {/* 이미지 */}
-      <div className={`relative ${item.aspect === "tall" ? "aspect-[3/4]" : "aspect-square"}`}>
-        {item.img ? (
-          <img
-            src={item.img}
-            alt={item.caption}
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[#FF3355] to-[#FF6680]" />
-        )}
-        {/* 그라데이션 */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
-        {/* 시간 배지 */}
-        <div className="absolute top-2.5 left-2.5 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
-          <span className="text-[9px] text-white font-bold">{item.time}</span>
-        </div>
-        {/* 그룹 배지 */}
-        <div className="absolute top-2.5 right-2.5 bg-black/30 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
-          <span className="text-[10px]">{item.verifyEmoji}</span>
-        </div>
-        {/* 하단 유저 + 캡션 */}
-        <div className="absolute bottom-0 left-0 right-0 p-3">
-          <button
-            className="flex items-center gap-1.5 mb-1 w-full active:opacity-70 transition-opacity"
-            onClick={e => { e.stopPropagation(); navigate(`/user/${item.seed}`); }}
-          >
-            <img
-              src={item.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`}
-              alt={item.user}
-              className="w-5 h-5 rounded-full bg-white/20 shrink-0 object-cover"
-            />
-            <span className="text-white text-[11px] font-black truncate">{item.user}</span>
-          </button>
-          <p className="text-white/75 text-[11px] leading-snug line-clamp-2">{item.caption}</p>
-        </div>
+      <style>{`
+        @keyframes fv-in { from{opacity:0} to{opacity:1} }
+        @keyframes fv-picker { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+      `}</style>
+
+      {/* 뒤로가기 버튼 (고정, 항상 표시) */}
+      <button
+        onClick={onClose}
+        className="fixed top-4 left-4 w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition-transform bg-black/10 dark:bg-black/50 border border-black/10 dark:border-white/15"
+        style={{ zIndex: 210, backdropFilter: "blur(8px)" }}
+      >
+        <ChevronLeft className="w-5 h-5 text-slate-800 dark:text-white" />
+      </button>
+
+      {/* 세로 자유 스크롤 피드 */}
+      <div ref={scrollRef} className="h-full overflow-y-scroll no-scrollbar" style={{ scrollBehavior: "auto" }}>
+        {items.map((item, idx) => {
+          const postId = item.postId ?? item.id;
+          const rxState = reactionsMap[postId] ?? { emoji: null, count: 0 };
+          const isPickerOpen = pickerFor === postId;
+          return (
+            <div
+              key={item.id}
+              ref={el => { itemRefs.current[idx] = el; }}
+              className="w-full flex flex-col"
+            >
+              {/* ── 상단: 유저 정보 (고정 높이) ── */}
+              <div
+                className="shrink-0 flex items-center gap-3 px-5 bg-white dark:bg-[#0d0d0d] border-b border-black/[0.06] dark:border-white/[0.06]"
+                style={{ height: 64 }}
+              >
+                <button
+                  className="flex items-center gap-3 active:opacity-70 transition-opacity"
+                  onClick={() => navigate(`/user/${item.seed}`)}
+                >
+                  <img
+                    src={item.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`}
+                    alt={item.user}
+                    className="w-9 h-9 rounded-full bg-slate-100 dark:bg-white/10 object-cover shrink-0 border border-black/10 dark:border-white/15"
+                    draggable={false}
+                  />
+                  <div className="text-left">
+                    <p className="text-slate-900 dark:text-white font-black text-[14px] leading-tight">{item.user}</p>
+                    <p className="text-slate-400 dark:text-white/40 text-[11px] leading-none mt-0.5">{item.time}</p>
+                  </div>
+                </button>
+              </div>
+
+              {/* ── 중앙: 사진 — 원본 비율, 최대 화면폭 × 최대 높이 제한 ── */}
+              <div className="w-full flex items-center justify-center bg-slate-100 dark:bg-black">
+                {item.img ? (
+                  <img
+                    src={item.img}
+                    alt={item.caption}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      height: "auto",
+                      maxHeight: "80dvh",
+                      objectFit: "contain",
+                    }}
+                    referrerPolicy="no-referrer"
+                    draggable={false}
+                  />
+                ) : (
+                  <div style={{ width: "100%", aspectRatio: "1", background: "linear-gradient(135deg,#FF3355,#FF6680)" }} />
+                )}
+              </div>
+
+              {/* ── 하단: 이모지 반응 (고정 높이) ── */}
+              <div
+                className="shrink-0 flex items-center justify-center relative bg-white dark:bg-[#0d0d0d] border-t border-black/[0.06] dark:border-white/[0.06]"
+                style={{ height: 64 }}
+                onClick={e => e.stopPropagation()}
+              >
+                {isPickerOpen && (
+                  <div
+                    className="absolute bottom-full mb-1 flex gap-1 rounded-2xl px-2 py-1.5 bg-slate-100 dark:bg-[#1e1e1e] border border-black/10 dark:border-white/10"
+                    style={{ animation: "fv-picker 0.15s ease both" }}
+                  >
+                    {FEED_REACTIONS.map(emoji => (
+                      <button
+                        key={emoji}
+                        onClick={() => void handleReact(postId, emoji)}
+                        className={`w-10 h-10 flex items-center justify-center text-[22px] rounded-xl active:scale-90 transition-transform ${rxState.emoji === emoji ? "bg-black/[0.08] dark:bg-white/[0.12]" : ""}`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => setPickerFor(isPickerOpen ? null : postId)}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full active:scale-95 transition-all border ${rxState.emoji ? "border-[#FF3355]/40 bg-[#FF3355]/[0.15]" : "border-black/10 dark:border-white/12 bg-black/[0.06] dark:bg-white/[0.07]"}`}
+                >
+                  <span className="text-[20px] leading-none">{rxState.emoji ?? "👍"}</span>
+                  <span className="text-slate-800 dark:text-white font-black text-[14px] tabular-nums">{rxState.count}</span>
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

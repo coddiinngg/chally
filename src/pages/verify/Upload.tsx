@@ -130,7 +130,7 @@ export function Upload() {
   /* ── 상단 바 ── */
   const TopBar = ({ accent }: { accent?: string }) => (
     <div className="relative z-10 flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
-      <button onClick={() => navigate(-1)}
+      <button onClick={() => navigate("/")}
         className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${
           d ? "bg-white/10 text-white/60 active:bg-white/20" : "bg-slate-100 text-slate-500 active:bg-slate-200"
         }`}>

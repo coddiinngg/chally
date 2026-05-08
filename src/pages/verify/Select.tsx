@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft } from "lucide-react";
+import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
 import { VERIFY_TYPES, VERIFY_TYPE_KEYS, type VerifyTypeKey } from "../../lib/verifyTypes";
@@ -29,9 +29,9 @@ export function VerifySelect() {
       <div className="shrink-0 bg-white border-b border-black/[0.05] px-4 pt-4 pb-4"
         style={{ animation: "vs-in 0.35s ease both" }}>
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)}
+          <button onClick={() => navigate("/")}
             className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 active:bg-slate-200 transition-colors shrink-0">
-            <ChevronLeft className="w-5 h-5 text-slate-600" />
+            <X className="w-4 h-4 text-slate-600" />
           </button>
           <div>
             <h1 className="text-[18px] font-black text-slate-900 leading-tight">인증 방식 선택</h1>

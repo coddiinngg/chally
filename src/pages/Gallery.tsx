@@ -110,6 +110,7 @@ export function Gallery() {
     lastTap: 0,
     tapX: 0, tapY: 0,
     isPinching: false,
+    startTime: 0,
   });
 
   useEffect(() => { const t = setTimeout(() => setMounted(true), 60); return () => clearTimeout(t); }, []);
@@ -280,6 +281,7 @@ export function Gallery() {
       touch.current.startY = t[0].clientY;
       touch.current.startPanX = panX;
       touch.current.startPanY = panY;
+      touch.current.startTime = Date.now();
       const now = Date.now();
       const dx  = Math.abs(t[0].clientX - touch.current.tapX);
       const dy  = Math.abs(t[0].clientY - touch.current.tapY);
@@ -320,8 +322,12 @@ export function Gallery() {
     if (isAnimating) return;
     touch.current.isPinching = false;
     if (scale <= 1) {
-      if (swipeOffset < -60)     { goNext(); setSwiping(false); return; }
-      else if (swipeOffset > 60) { goPrev(); setSwiping(false); return; }
+      const elapsed = Math.max(1, Date.now() - touch.current.startTime);
+      const velocity = swipeOffset / elapsed; // px/ms
+      const shouldGoNext = swipeOffset < -40 || velocity < -0.35;
+      const shouldGoPrev = swipeOffset >  40 || velocity >  0.35;
+      if (shouldGoNext)      { goNext(); setSwiping(false); return; }
+      else if (shouldGoPrev) { goPrev(); setSwiping(false); return; }
       setSwipeOffset(0);
       setSwiping(false);
     }
@@ -557,14 +563,14 @@ export function Gallery() {
       {/* ── 라이트박스 ── */}
       {item && lightbox !== null && (
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-black"
+          className="fixed inset-0 z-50 bg-black"
           style={{ animation: "gl-bg 0.2s ease both" }}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
         >
           <div
-            className="shrink-0 flex items-center justify-between px-5 pt-10 pb-3 z-10"
+            className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 pt-10 pb-3 z-20"
             style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)" }}
           >
             <div>
@@ -589,24 +595,29 @@ export function Gallery() {
             </button>
           </div>
 
-          <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+          <div className="absolute inset-0 top-[72px] bottom-[160px] flex items-center justify-center overflow-hidden">
+            {/* 이전 이미지 — 항상 왼쪽에 위치, 드래그 시 따라옴 */}
             {lightbox > 0 && (
               <div className="absolute inset-0 flex items-center justify-center"
-                style={{ transform: `translateX(calc(-100% + ${swipeOffset}px))`, opacity: swipeOffset > 0 ? 1 : 0, transition: "none" }}>
-                <div className="w-4/5 aspect-square rounded-3xl overflow-hidden">
+                style={{
+                  transform: `translateX(calc(-100% + ${swipeOffset}px))`,
+                  transition: swiping ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+                }}>
+                <div className="w-[88%] aspect-square rounded-3xl overflow-hidden opacity-70">
                   <PhotoCard grad={filtered[lightbox - 1].grad} label={filtered[lightbox - 1].label} photoUrl={filtered[lightbox - 1].photoUrl} size="lg" />
                 </div>
               </div>
             )}
+            {/* 현재 이미지 */}
             <div
               className="absolute inset-0 flex items-center justify-center"
               style={{
                 transform: `translateX(${swipeOffset}px)`,
-                transition: swiping ? "none" : "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
+                transition: swiping ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
               }}
             >
               <div
-                className="w-4/5 aspect-square rounded-3xl overflow-hidden relative"
+                className="w-[88%] aspect-square rounded-3xl overflow-hidden relative"
                 style={{
                   transform: `scale(${scale}) translate(${panX / scale}px, ${panY / scale}px)`,
                   transition: scale === 1 && !swiping ? "transform 0.3s cubic-bezier(0.34,1.2,0.64,1)" : "none",
@@ -627,10 +638,14 @@ export function Gallery() {
                 )}
               </div>
             </div>
+            {/* 다음 이미지 — 항상 오른쪽에 위치, 드래그 시 따라옴 */}
             {lightbox < filtered.length - 1 && (
               <div className="absolute inset-0 flex items-center justify-center"
-                style={{ transform: `translateX(calc(100% + ${swipeOffset}px))`, opacity: swipeOffset < 0 ? 1 : 0, transition: "none" }}>
-                <div className="w-4/5 aspect-square rounded-3xl overflow-hidden">
+                style={{
+                  transform: `translateX(calc(100% + ${swipeOffset}px))`,
+                  transition: swiping ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+                }}>
+                <div className="w-[88%] aspect-square rounded-3xl overflow-hidden opacity-70">
                   <PhotoCard grad={filtered[lightbox + 1].grad} label={filtered[lightbox + 1].label} photoUrl={filtered[lightbox + 1].photoUrl} size="lg" />
                 </div>
               </div>
@@ -638,7 +653,7 @@ export function Gallery() {
           </div>
 
           <div
-            className="shrink-0 pb-14 pt-4 z-10"
+            className="absolute bottom-0 left-0 right-0 pb-14 pt-4 z-20"
             style={{ background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)" }}
           >
             <div className="flex items-center justify-between px-8 mb-5">

@@ -1,31 +1,37 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, CheckCircle2, Trophy, Users, Star, Flame, Bell, Check, X } from "lucide-react";
+import { ChevronLeft, CheckCircle2, Trophy, Users, Star, Flame, Bell, Check, X, AlertTriangle, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { useApp, type NotifType, type AppNotification } from "../contexts/AppContext";
 
 const TYPE_ICON: Record<NotifType, React.ElementType> = {
-  goal:   CheckCircle2,
-  badge:  Star,
-  group:  Users,
-  rank:   Trophy,
-  streak: Flame,
+  goal:           CheckCircle2,
+  badge:          Star,
+  group:          Users,
+  rank:           Trophy,
+  streak:         Flame,
+  member_warning: AlertTriangle,
+  member_removed: LogOut,
 };
 
 const TYPE_COLOR: Record<NotifType, string> = {
-  goal:   "#10B981",
-  badge:  "#F59E0B",
-  group:  "#6366F1",
-  rank:   "#F97316",
-  streak: "#FB923C",
+  goal:           "#10B981",
+  badge:          "#F59E0B",
+  group:          "#6366F1",
+  rank:           "#F97316",
+  streak:         "#FB923C",
+  member_warning: "#D97706",
+  member_removed: "#FF3355",
 };
 
 const TYPE_BG: Record<NotifType, string> = {
-  goal:   "#ECFDF5",
-  badge:  "#FFFBEB",
-  group:  "#EEF2FF",
-  rank:   "#FFF7ED",
-  streak: "#FFF7ED",
+  goal:           "#ECFDF5",
+  badge:          "#FFFBEB",
+  group:          "#EEF2FF",
+  rank:           "#FFF7ED",
+  streak:         "#FFF7ED",
+  member_warning: "#FFFBEB",
+  member_removed: "#FFF1F2",
 };
 
 export function Notifications() {

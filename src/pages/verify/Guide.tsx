@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, Camera, CheckCircle2 } from "lucide-react";
+import { X, Camera, CheckCircle2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../../lib/verifyTypes";
@@ -43,10 +43,10 @@ export function VerifyGuide() {
       {/* ── 헤더 ── */}
       <div className="shrink-0 flex items-center justify-between px-4 pt-4 pb-3.5"
         style={{ background: cardBg, borderBottom: `1px solid ${divider}`, animation: "guide-in 0.3s ease both" }}>
-        <button onClick={() => navigate(-1)}
+        <button onClick={() => navigate("/")}
           className="w-9 h-9 flex items-center justify-center rounded-full active:opacity-60 transition-opacity"
           style={{ background: d ? "rgba(255,255,255,0.08)" : "#F2F2F7" }}>
-          <ChevronLeft className="w-5 h-5" style={{ color: textPri }} />
+          <X className="w-4 h-4" style={{ color: textPri }} />
         </button>
         <p className="text-[16px] font-black" style={{ color: textPri }}>인증 가이드</p>
         {/* 플로우 표시: 선택 → 가이드 → 촬영 */}
