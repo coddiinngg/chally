@@ -290,7 +290,7 @@ function Slide3({ on }: { on: boolean }) {
           style={{ animation: on ? "ob-fade 0.5s ease 80ms both" : "none" }}
         >
           <div className="w-1.5 h-1.5 rounded-full bg-amber-300" style={{ animation: "ob-orb 2s ease-in-out infinite" }} />
-          <span className="text-amber-300 text-[12px] font-semibold tracking-wide">실시간 공동 달성</span>
+          <span className="text-amber-300 text-[12px] font-semibold tracking-wide">실시간 동기부여</span>
         </div>
         <div className="relative w-[300px] h-[280px]">
           {/* 메인 글라스 카드 — 러닝 크루 커버 사진 + 랭킹 */}
@@ -391,7 +391,7 @@ function Slide3({ on }: { on: boolean }) {
           className="text-[14px] leading-relaxed text-white/45 font-medium break-keep mt-2"
           style={{ animation: on ? "ob-fade 0.5s ease 380ms both" : "none" }}
         >
-          하고자 하는 마음만 있다면 하게 됩니다.
+          챌린지 과정을 함께 공유해요.
         </p>
       </div>
     </div>
