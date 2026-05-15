@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, Flame, TrendingUp, TrendingDown, Minus, Target, Calendar, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import type { Verification } from "../types/database";
+import { useScrollRestoration, isReturningVisit, usePersistedNumber } from "../lib/useScrollRestoration";
 
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
@@ -118,8 +119,10 @@ function Trend({ curr, prev }: { curr: number; prev: number }) {
 export function WeeklyReport() {
   const navigate = useNavigate();
   const { nickname, verificationHistory } = useApp();
-  const [weekIdx, setWeekIdx] = useState(0);
-  const [mounted, setMounted] = useState(false);
+  const [weekIdx, setWeekIdx] = usePersistedNumber("wr-week-idx", 0);
+  const [mounted, setMounted] = useState(() => isReturningVisit("wr-scroll"));
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestoration("wr-scroll", scrollRef);
 
   const completed = verificationHistory.filter(v => v.status === "completed");
   const currentWeekStart = startOfWeek(new Date());
@@ -129,6 +132,7 @@ export function WeeklyReport() {
   ];
 
   useEffect(() => {
+    if (mounted) return;
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);
@@ -187,7 +191,7 @@ export function WeeklyReport() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-8">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto pb-8">
 
         {/* 히어로 배너 */}
         <div

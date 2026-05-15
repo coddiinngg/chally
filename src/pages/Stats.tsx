@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { TrendingUp, Flame, Calendar, Trophy, CheckCircle2, ChevronRight, ImageIcon, ChevronLeft } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
+import { useScrollRestoration, isReturningVisit, usePersistedNumber } from "../lib/useScrollRestoration";
 
 function useCountUp(target: number, duration = 900, delay = 0) {
   const [val, setVal] = useState(0);
@@ -123,20 +124,11 @@ function CalendarHeatmap({
 export function Stats() {
   const { verificationHistory, verificationLoading, groups } = useApp();
   const navigate = useNavigate();
-  const [mounted, setMounted] = useState(false);
-  const [calOffset, setCalOffset] = useState(0);
+  const [mounted, setMounted] = useState(() => isReturningVisit("st-scroll"));
+  const [calOffset, setCalOffset] = usePersistedNumber("st-cal-offset", 0);
   const calendarRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const SCROLL_KEY = "st-scroll";
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const saved = sessionStorage.getItem(SCROLL_KEY);
-    if (saved) el.scrollTop = Number(saved);
-    const onScroll = () => sessionStorage.setItem(SCROLL_KEY, String(el.scrollTop));
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+  useScrollRestoration("st-scroll", scrollRef, !verificationLoading);
   const completedVerifications = verificationHistory.filter(item => item.status === "completed");
   const now = new Date();
   const calendarDate = new Date(now.getFullYear(), now.getMonth() + calOffset, 1);
@@ -227,6 +219,7 @@ export function Stats() {
   const calMonth = `${calYear}년 ${MONTH_NAMES[calMonthIndex]}`;
 
   useEffect(() => {
+    if (mounted) return;
     const t = setTimeout(() => setMounted(true), 80);
     return () => clearTimeout(t);
   }, []);
@@ -322,11 +315,34 @@ export function Stats() {
           )}
         </div>
 
-        {/* 인증 히스토리 — 주간 차트 바로 아래 */}
+        {/* 나의 챌린지 */}
+        <div
+          onClick={() => navigate("/stats/challenge-history")}
+          className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.05] shadow-[0_2px_14px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-transform duration-150 cursor-pointer"
+          style={{ animation: "st-fade 0.45s ease 80ms both" }}
+        >
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-[22px]"
+            style={{ background: "linear-gradient(135deg,#FF3355,#ff5570)", boxShadow: "0 4px 14px rgba(255,51,85,0.3)" }}
+          >
+            🏆
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[14px] font-black text-slate-900">나의 챌린지</p>
+            <p className="text-[12px] text-slate-400 mt-0.5">
+              {totalParticipated > 0 ? `총 ${totalParticipated}개 참여 · 이전 기록 보기` : "아직 참여한 챌린지가 없어요"}
+            </p>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-[#FFE8EC] flex items-center justify-center shrink-0">
+            <ChevronRight className="w-4 h-4 text-[#FF3355]" />
+          </div>
+        </div>
+
+        {/* 인증 히스토리 */}
         <div
           onClick={() => navigate("/gallery")}
           className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.05] shadow-[0_2px_14px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-transform duration-150 cursor-pointer"
-          style={{ animation: "st-fade 0.45s ease 80ms both" }}
+          style={{ animation: "st-fade 0.45s ease 100ms both" }}
         >
           <div className="shrink-0">
             {recentPhotoThumbs.length > 0 ? (
@@ -413,29 +429,6 @@ export function Stats() {
               <p className="text-[10px] text-slate-400 mt-0.5">{label}</p>
             </div>
           ))}
-        </div>
-
-        {/* 참여했던 챌린지 */}
-        <div
-          onClick={() => navigate("/stats/challenge-history")}
-          className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.05] shadow-[0_2px_14px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-transform duration-150 cursor-pointer"
-          style={{ animation: "st-fade 0.45s ease 420ms both" }}
-        >
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-[22px]"
-            style={{ background: "linear-gradient(135deg,#FF3355,#ff5570)", boxShadow: "0 4px 14px rgba(255,51,85,0.3)" }}
-          >
-            🏆
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[14px] font-black text-slate-900">참여했던 챌린지</p>
-            <p className="text-[12px] text-slate-400 mt-0.5">
-              {totalParticipated > 0 ? `총 ${totalParticipated}개 참여 · 이전 기록 보기` : "아직 참여한 챌린지가 없어요"}
-            </p>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-[#FFE8EC] flex items-center justify-center shrink-0">
-            <ChevronRight className="w-4 h-4 text-[#FF3355]" />
-          </div>
         </div>
 
         {/* 월간 히트맵 달력 */}

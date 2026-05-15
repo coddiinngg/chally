@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, Search, ChevronUp, ChevronDown, MessageCircle, Share2,
   Bell, Plus, X, Flame, CheckCircle, Clock, Send, Heart, ArrowRight,
@@ -8,6 +8,7 @@ import { shareOrCopy } from "../lib/share";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import type { ChallengeSuggestionCommentRecord, ChallengeSuggestionRecord } from "../types/database";
+import { useScrollRestoration, usePersistedState } from "../lib/useScrollRestoration";
 
 /* ── 타입 ── */
 type Status   = "투표중" | "개발확정" | "검토중";
@@ -262,8 +263,13 @@ function ListView({
   onDetail: (id: string) => void;
   onCheer: (id: string, next: boolean) => void;
 }) {
-  const [tab, setTab]   = useState<Tab>("전체");
+  const [tab, setTab] = usePersistedState<Tab>(
+    "cr-tab", "전체",
+    (v): v is Tab => v === "전체" || v === "모으는중" || v === "만드는중" || v === "내건의",
+  );
   const [query, setQuery] = useState("");
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestoration("cr-list-scroll", listScrollRef, !loading);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "전체",     label: "전체" },
@@ -327,7 +333,7 @@ function ListView({
       </div>
 
       {/* 목록 */}
-      <div className="flex-1 overflow-y-auto no-sb px-4 pt-4 pb-32">
+      <div ref={listScrollRef} className="flex-1 overflow-y-auto no-sb px-4 pt-4 pb-32">
         {loading && (
           <p className="text-center text-[12px] text-slate-400 font-semibold py-4">건의함을 불러오는 중...</p>
         )}

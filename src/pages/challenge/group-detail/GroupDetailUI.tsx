@@ -8,6 +8,7 @@ import { supabase } from "../../../lib/supabase";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../../../lib/verifyTypes";
 import { formatActivityTime, loadActivityFeed, type ActivityFeedItem } from "../../../lib/activity";
 import { getPhase, getBenefitGrade, phaseLabel } from "../../../lib/challengeUtils";
+import { useScrollRestoration } from "../../../lib/useScrollRestoration";
 
 const PHASE_COLORS: Record<string, string> = {
   "모집중":   "#3B82F6",
@@ -53,6 +54,11 @@ const INVITE_BASE = "https://chally.app/join/GROUP-";
 const PG = "linear-gradient(115deg,#FF3355,#FF6680)";
 const PS = "0 8px 24px -4px rgba(255,51,85,0.4)";
 
+// 페이지 복귀 시 깜빡임을 막기 위한 메모리 캐시 (모듈 단위)
+const activityCache    = new Map<string, ActivityFeedItem[]>();
+const leaderboardCache = new Map<string, LeaderboardItem[]>();
+const crewStatusCache  = new Map<string, CrewStatus | null>();
+
 const rateColor = (r: number) =>
   r >= 80 ? "#10B981" : r >= 50 ? "#F59E0B" : "#FF3355";
 
@@ -67,14 +73,35 @@ export function GroupDetailUI() {
   const { state: locState } = useLocation() as { state: { tab?: "leaderboard" | "activity" | "gallery"; skipAnimation?: boolean; fromActivityPhoto?: boolean } | null };
 
   const group = groups.find(g => g.id === groupId);
-  const [activityPosts, setActivityPosts] = useState<ActivityFeedItem[]>([]);
-  const [activityLoading, setActivityLoading] = useState(false);
-  const [leaderboardRows, setLeaderboardRows] = useState<LeaderboardItem[]>([]);
-  const [crewStatus, setCrewStatus] = useState<CrewStatus | null>(null);
+  const initialDbId = group?.dbId ?? null;
+  const scrollKeyInit = `gd-scroll-${groupId}`;
+  const hasCachedActivity = !!initialDbId && activityCache.has(initialDbId);
+  const isReturning = hasCachedActivity || sessionStorage.getItem(scrollKeyInit) !== null;
 
-  const skipAnim = locState?.skipAnimation ?? false;
+  const [activityPosts, setActivityPosts] = useState<ActivityFeedItem[]>(() => {
+    if (!initialDbId) return [];
+    return activityCache.get(initialDbId) ?? [];
+  });
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityFirstLoaded, setActivityFirstLoaded] = useState(hasCachedActivity);
+  const [leaderboardRows, setLeaderboardRows] = useState<LeaderboardItem[]>(() => {
+    if (!initialDbId) return [];
+    return leaderboardCache.get(initialDbId) ?? [];
+  });
+  const [crewStatus, setCrewStatus] = useState<CrewStatus | null>(() => {
+    if (!initialDbId) return null;
+    return crewStatusCache.get(initialDbId) ?? null;
+  });
+
+  const skipAnim = (locState?.skipAnimation ?? false) || isReturning;
+  const tabKey                                  = `gd-tab-${groupId}`;
   const [mounted, setMounted]                   = useState(skipAnim);
-  const [tab, setTab]                           = useState<"leaderboard" | "activity" | "gallery">(locState?.tab ?? "activity");
+  const [tab, setTab]                           = useState<"leaderboard" | "activity" | "gallery">(() => {
+    if (locState?.tab) return locState.tab;
+    const saved = sessionStorage.getItem(tabKey);
+    if (saved === "leaderboard" || saved === "activity" || saved === "gallery") return saved;
+    return "activity";
+  });
   const [lightbox, setLightbox]                 = useState<{ url: string; name: string; seed: string; avatarUrl?: string | null; time: string } | null>(null);
   const [copied, setCopied]                     = useState(false);
   const [showInvite, setShowInvite]             = useState(false);
@@ -90,27 +117,16 @@ export function GroupDetailUI() {
   const tabBarRef                               = useRef<HTMLDivElement>(null);
   const scrollKey                               = `gd-scroll-${groupId}`;
 
+  useScrollRestoration(scrollKey, scrollRef, !!group && activityFirstLoaded);
+
+  useEffect(() => {
+    sessionStorage.setItem(tabKey, tab);
+  }, [tab, tabKey]);
+
   useEffect(() => {
     if (skipAnim) return;
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    if (!skipAnim || !scrollRef.current) return;
-    const saved = sessionStorage.getItem(scrollKey);
-    if (saved) {
-      scrollRef.current.scrollTop = parseInt(saved);
-      sessionStorage.removeItem(scrollKey);
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (scrollRef.current) {
-        sessionStorage.setItem(scrollKey, String(scrollRef.current.scrollTop));
-      }
-    };
   }, []);
 
   const groupDbId = group?.dbId ?? null;
@@ -187,15 +203,23 @@ export function GroupDetailUI() {
         setActivityPosts([]);
         return;
       }
-      setActivityLoading(true);
+      const cached = activityCache.get(groupDbId);
+      // 캐시가 있으면 로딩 표시 없이 백그라운드에서 갱신
+      if (!cached) setActivityLoading(true);
       try {
         const posts = await loadActivityFeed({ groupId: groupDbId, userId: user?.id ?? null, limit: 40, withinChallengePeriod: true });
-        if (!cancelled) setActivityPosts(posts);
+        if (!cancelled) {
+          setActivityPosts(posts);
+          activityCache.set(groupDbId, posts);
+        }
       } catch (error) {
         console.error("Failed to load group activity", error);
-        if (!cancelled) setActivityPosts([]);
+        if (!cancelled && !cached) setActivityPosts([]);
       } finally {
-        if (!cancelled) setActivityLoading(false);
+        if (!cancelled) {
+          setActivityLoading(false);
+          setActivityFirstLoaded(true);
+        }
       }
     }
     void loadGroupActivity();
@@ -211,10 +235,13 @@ export function GroupDetailUI() {
       }
       try {
         const rows = await loadGroupLeaderboard(groupDbId, 30);
-        if (!cancelled) setLeaderboardRows(rows);
+        if (!cancelled) {
+          setLeaderboardRows(rows);
+          leaderboardCache.set(groupDbId, rows);
+        }
       } catch (error) {
         console.error("Failed to load leaderboard", error);
-        if (!cancelled) setLeaderboardRows([]);
+        if (!cancelled && !leaderboardCache.has(groupDbId)) setLeaderboardRows([]);
       }
     }
     void loadLeaderboard();
@@ -230,6 +257,7 @@ export function GroupDetailUI() {
       if (error || !data?.length) { setCrewStatus(null); return; }
       const status = data[0] as CrewStatus;
       setCrewStatus(status);
+      crewStatusCache.set(groupDbId, status);
       if (status.my_status === "REMOVED") {
         markGroupLeft(groupDbId);
         navigate("/challenge", { replace: true, state: { removedGroupId: groupDbId } });

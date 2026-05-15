@@ -2,13 +2,13 @@ import { Search, Users, ChevronDown,
          Activity, BookOpen, Apple, Sparkles, Trophy } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { useApp } from "../contexts/AppContext";
 import { useGuestGuard } from "../contexts/GuestGuardContext";
 import { getPhase, shouldHide, canJoin, phaseLabel, isLateJoiner, daysSinceEnd } from "../lib/challengeUtils";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../lib/verifyTypes";
 import type { Group } from "../contexts/AppContext";
-import { useRef, useLayoutEffect } from "react";
+import { useScrollRestoration, isReturningVisit, usePersistedState } from "../lib/useScrollRestoration";
 
 function fmtDate(d: string): string {
   const dt = new Date(d);
@@ -121,12 +121,15 @@ export function Challenge() {
     refreshGroups, confirmedEndedIds, confirmEndedGroup,
   } = useApp();
   const { guardAction } = useGuestGuard();
-  const [activeCat, setActiveCat] = useState("전체");
+  const [activeCat, setActiveCat] = usePersistedState<string>("ch-cat", "전체");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const [filterMode, setFilterMode] = useState<"전체" | "참여중" | "지난">("전체");
+  const [filterMode, setFilterMode] = usePersistedState<"전체" | "참여중" | "지난">(
+    "ch-filter", "전체",
+    (v): v is "전체" | "참여중" | "지난" => v === "전체" || v === "참여중" || v === "지난",
+  );
   const [showDropdown, setShowDropdown] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(() => isReturningVisit("ch-scroll"));
   const [joinTarget, setJoinTarget] = useState<{ id: string; title: string; desc: string; members: number; challengeStart: string | null; challengeEnd: string | null } | null>(null);
   const [leaveTarget, setLeaveTarget] = useState<{ id: string; title: string } | null>(null);
   const [removedToast, setRemovedToast] = useState(!!(location.state as { removedGroupId?: string } | null)?.removedGroupId);
@@ -136,28 +139,7 @@ export function Challenge() {
   useEffect(() => { void refreshGroups(); }, []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const SCROLL_KEY = "ch-scroll";
-  const scrollRestoredRef = useRef(false);
-
-  // groups 데이터 로드 완료 후 한 번만 스크롤 복원 (콘텐츠 높이가 확정된 뒤)
-  useLayoutEffect(() => {
-    if (scrollRestoredRef.current) return;
-    if (groupsLoading) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    const saved = sessionStorage.getItem(SCROLL_KEY);
-    if (saved) el.scrollTop = Number(saved);
-    scrollRestoredRef.current = true;
-  }, [groupsLoading]);
-
-  // 스크롤 위치 추적은 마운트와 동시에 등록 (저장만)
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => sessionStorage.setItem(SCROLL_KEY, String(el.scrollTop));
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+  useScrollRestoration("ch-scroll", scrollRef, !groupsLoading);
 
   const liveUnjoined = groups.filter(g => {
     if (g.joined || g.isRemoved || g.isLeft) return false;
@@ -166,6 +148,7 @@ export function Challenge() {
   });
 
   useEffect(() => {
+    if (mounted) return;
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);

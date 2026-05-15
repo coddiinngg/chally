@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChevronLeft, Flame, Trophy, ChevronRight } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { getGrade, getNextGrade } from "../lib/grades";
 import type { PublicProfileRecord } from "../types/database";
+import { useScrollRestoration, isReturningVisit } from "../lib/useScrollRestoration";
 
 function fmtDate(iso: string): string {
   const d = new Date(iso);
@@ -13,12 +14,15 @@ function fmtDate(iso: string): string {
 export function UserProfile() {
   const { seed: userId = "" } = useParams<{ seed: string }>();
   const navigate = useNavigate();
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(() => isReturningVisit(`usr-scroll-${userId}`));
   const [profile, setProfile] = useState<PublicProfileRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestoration(`usr-scroll-${userId}`, scrollRef, !loading);
 
   useEffect(() => {
+    if (mounted) return;
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);

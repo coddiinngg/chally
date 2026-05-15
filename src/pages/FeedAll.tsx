@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../lib/verifyTypes";
 import { formatActivityTime, loadActivityFeed, reactionCache, type ActivityFeedItem } from "../lib/activity";
+import { useScrollRestoration } from "../lib/useScrollRestoration";
 import { supabase } from "../lib/supabase";
 
 let feedCache: ActivityFeedItem[] | null = null;
@@ -223,6 +224,8 @@ export function FeedAll() {
   );
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIdx, setViewerIdx] = useState(0);
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestoration("fd-scroll", mainScrollRef, !loading);
 
   useEffect(() => {
     let cancelled = false;
@@ -272,7 +275,7 @@ export function FeedAll() {
       </header>
 
       {/* 3열 그리드 */}
-      <div className="flex-1 overflow-y-auto no-scrollbar px-3 pt-3 pb-6">
+      <div ref={mainScrollRef} className="flex-1 overflow-y-auto no-scrollbar px-3 pt-3 pb-6">
         {loading && items.length === 0 && (
           <div className="grid grid-cols-3 gap-1.5">
             {Array.from({ length: 18 }, (_, i) => (

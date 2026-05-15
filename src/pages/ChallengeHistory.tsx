@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Users, Calendar, CheckCircle2 } from "lucide-react";
 import { useApp } from "../contexts/AppContext";
 import { cn } from "../lib/utils";
+import { useScrollRestoration, isReturningVisit } from "../lib/useScrollRestoration";
 
 function getPhase(start: string | null, end: string | null): "upcoming" | "active" | "ended" {
   if (!start || !end) return "active";
@@ -19,10 +20,13 @@ function fmtDate(d: string): string {
 
 export function ChallengeHistory() {
   const navigate = useNavigate();
-  const { groups, verificationHistory } = useApp();
-  const [mounted, setMounted] = useState(false);
+  const { groups, groupsLoading, verificationHistory } = useApp();
+  const [mounted, setMounted] = useState(() => isReturningVisit("ch-hist-scroll"));
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestoration("ch-hist-scroll", scrollRef, !groupsLoading);
 
   useEffect(() => {
+    if (mounted) return;
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);
@@ -60,7 +64,7 @@ export function ChallengeHistory() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-8">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 pb-8">
         {participated.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 py-20">
             <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-2xl">🏆</div>

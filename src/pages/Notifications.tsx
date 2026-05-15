@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChevronLeft, CheckCircle2, Trophy, Users, Star, Flame, Bell, Check, X, AlertTriangle, LogOut, Zap, Flag, Timer } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { useApp, type NotifType, type AppNotification } from "../contexts/AppContext";
+import { useScrollRestoration, isReturningVisit } from "../lib/useScrollRestoration";
 
 const TYPE_ICON: Record<NotifType, React.ElementType> = {
   goal:            CheckCircle2,
@@ -49,9 +50,12 @@ const TYPE_BG: Record<NotifType, string> = {
 export function Notifications() {
   const navigate = useNavigate();
   const { notifications, notificationsLoading, markNotifRead, markAllNotifsRead, handleNotifAction } = useApp();
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(() => isReturningVisit("nt-scroll"));
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestoration("nt-scroll", scrollRef, !notificationsLoading);
 
   useEffect(() => {
+    if (mounted) return;
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);
@@ -92,7 +96,7 @@ export function Notifications() {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
 
         {/* 읽지 않은 알림 */}
         {unread.length > 0 && (

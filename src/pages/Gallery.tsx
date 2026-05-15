@@ -5,6 +5,7 @@ import { cn } from "../lib/utils";
 import { useApp } from "../contexts/AppContext";
 import { shareOrCopy } from "../lib/share";
 import { supabase } from "../lib/supabase";
+import { useScrollRestoration, isReturningVisit, usePersistedState, usePersistedNumber } from "../lib/useScrollRestoration";
 
 type ViewMode = "grid" | "month" | "year";
 
@@ -80,17 +81,21 @@ function PhotoCard({ grad, label, photoUrl, size }: {
 export function Gallery() {
   const navigate = useNavigate();
   const { state: locationState } = useLocation() as { state: { openId?: string } | null };
-  const { verificationHistory } = useApp();
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [cols, setCols] = useState(3);
-  const [filter, setFilter] = useState("전체");
-  const [mounted, setMounted] = useState(false);
+  const { verificationHistory, verificationLoading } = useApp();
+  const [viewMode, setViewMode] = usePersistedState<ViewMode>(
+    "gl-view", "grid",
+    (v): v is ViewMode => v === "grid" || v === "month" || v === "year",
+  );
+  const [cols, setCols] = usePersistedNumber("gl-cols", 3);
+  const [filter, setFilter] = usePersistedState<string>("gl-filter", "전체");
+  const [mounted, setMounted] = useState(() => isReturningVisit("gl-scroll"));
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [reactionMap, setReactionMap] = useState<Map<string, number>>(new Map());
   const wheelAcc = useRef(0);
   const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const thumbsRef = useRef<HTMLDivElement>(null);
+  useScrollRestoration("gl-scroll", gridRef, !verificationLoading);
 
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [swiping, setSwiping]         = useState(false);
@@ -115,7 +120,7 @@ export function Gallery() {
     startTime: 0,
   });
 
-  useEffect(() => { const t = setTimeout(() => setMounted(true), 60); return () => clearTimeout(t); }, []);
+  useEffect(() => { if (mounted) return; const t = setTimeout(() => setMounted(true), 60); return () => clearTimeout(t); }, []);
 
   // 인증별 좋아요 수 로드
   useEffect(() => {

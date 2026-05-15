@@ -1,15 +1,11 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
-import { Bell, LogOut, Ticket, Pencil, ChevronRight, Star, UserPlus, Moon, Sun, Smartphone, Flame, Trophy } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Bell, LogOut, Ticket, Pencil, ChevronRight, Award, UserPlus, Moon, Sun, Smartphone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useGuestGuard } from "../contexts/GuestGuardContext";
 import { getGrade, getNextGrade } from "../lib/grades";
-
-function fmtDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-}
+import { useScrollRestoration, isReturningVisit } from "../lib/useScrollRestoration";
 
 function useCountUp(target: number, duration = 900, delay = 400) {
   const [val, setVal] = useState(0);
@@ -48,34 +44,13 @@ function StatBadge({ label, targetVal, suffix, delay }: { label: string; targetV
 
 export function Profile() {
   const navigate = useNavigate();
-  const { nickname, theme, setTheme, recoveryTickets, verificationHistory, groups, groupsLoading } = useApp();
+  const { nickname, theme, setTheme, recoveryTickets, verificationHistory, groupsLoading } = useApp();
   const { signOut, profile } = useAuth();
   const { guardAction } = useGuestGuard();
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(() => isReturningVisit("pf-scroll"));
   const [signOutError, setSignOutError] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const SCROLL_KEY = "pf-scroll";
-  const scrollRestoredRef = useRef(false);
-
-  // 데이터 로드 완료 후 스크롤 복원
-  useLayoutEffect(() => {
-    if (scrollRestoredRef.current) return;
-    if (groupsLoading) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    const saved = sessionStorage.getItem(SCROLL_KEY);
-    if (saved) el.scrollTop = Number(saved);
-    scrollRestoredRef.current = true;
-  }, [groupsLoading]);
-
-  // 스크롤 위치 저장
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => sessionStorage.setItem(SCROLL_KEY, String(el.scrollTop));
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+  useScrollRestoration("pf-scroll", scrollRef, !groupsLoading);
   const xpTotal = profile?.xp_total ?? 0;
   const grade = getGrade(xpTotal);
   const nextGrade = getNextGrade(grade.level);
@@ -96,19 +71,8 @@ export function Profile() {
     { label: "성공률", targetVal: successRate,    suffix: "%",  delay: 700 },
   ];
 
-  // 참여중인 챌린지 (ACTIVE/EXIT_ELIGIBLE + 진행 중)
-  const now = new Date();
-  const myActiveGroups = groups.filter(g =>
-    g.joined && !g.isRemoved && !g.isLeft &&
-    (!g.challengeEnd || new Date(g.challengeEnd) > now)
-  );
-  // 참여했던 챌린지 (ACTIVE로 끝까지 + 종료됨)
-  const myPastGroups = groups.filter(g =>
-    g.joined && !g.isRemoved && !g.isLeft &&
-    g.challengeEnd !== null && new Date(g.challengeEnd) <= now
-  );
-
   useEffect(() => {
+    if (mounted) return;
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);
@@ -261,118 +225,6 @@ export function Profile() {
           </div>
         </div>
 
-        {/* 참여중인 챌린지 */}
-        <div
-          style={{
-            opacity: mounted ? 1 : 0,
-            transform: mounted ? "translateY(0)" : "translateY(14px)",
-            transition: "all 0.5s 0.4s cubic-bezier(0.4,0,0.2,1)",
-          }}
-        >
-          <div className="flex items-center justify-between mb-2 ml-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">참여중인 챌린지</p>
-            {myActiveGroups.length > 0 && (
-              <span className="text-[10px] text-slate-300 mr-1">{myActiveGroups.length}개</span>
-            )}
-          </div>
-          {myActiveGroups.length === 0 ? (
-            <div className="rounded-2xl bg-white dark:bg-[#12161E] border border-black/[0.04] dark:border-white/[0.07] p-8 flex flex-col items-center">
-              <span className="text-3xl mb-2">🏅</span>
-              <p className="text-[13px] text-slate-400">참여 중인 챌린지가 없어요</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {myActiveGroups.map((g, i) => (
-                <div
-                  key={g.id}
-                  onClick={() => navigate(`/challenge/group/${g.id}`)}
-                  className="rounded-2xl bg-white dark:bg-[#12161E] border border-black/[0.04] dark:border-white/[0.07] px-4 py-4 flex items-center gap-3 active:bg-slate-50 dark:active:bg-white/[0.04] transition-colors cursor-pointer"
-                  style={{
-                    opacity: mounted ? 1 : 0,
-                    transform: mounted ? "translateY(0)" : "translateY(10px)",
-                    transition: `all 0.4s ${0.45 + i * 0.06}s cubic-bezier(0.4,0,0.2,1)`,
-                  }}
-                >
-                  <div className="w-9 h-9 rounded-xl bg-[#FFE8EC] dark:bg-[#3A1620] flex items-center justify-center shrink-0">
-                    <Flame className="w-4 h-4 text-[#FF3355]" />
-                  </div>
-                  <p className="flex-1 font-bold text-[14px] text-slate-800 dark:text-slate-100 truncate">{g.title}</p>
-                  <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 shrink-0" />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* 참여했던 챌린지 */}
-        <div
-          style={{
-            opacity: mounted ? 1 : 0,
-            transform: mounted ? "translateY(0)" : "translateY(14px)",
-            transition: "all 0.5s 0.5s cubic-bezier(0.4,0,0.2,1)",
-          }}
-        >
-          <div className="flex items-center justify-between mb-2 ml-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">참여했던 챌린지</p>
-            {myPastGroups.length > 0 && (
-              <span className="text-[10px] text-slate-300 mr-1">{myPastGroups.length}개</span>
-            )}
-          </div>
-          {myPastGroups.length === 0 ? (
-            <div className="rounded-2xl bg-white dark:bg-[#12161E] border border-black/[0.04] dark:border-white/[0.07] p-8 flex flex-col items-center">
-              <span className="text-3xl mb-2">🏆</span>
-              <p className="text-[13px] text-slate-400">아직 완주한 챌린지가 없어요</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {myPastGroups.map((g, i) => {
-                const ratePct = g.crewRate;
-                const achieved = ratePct >= 50;
-                return (
-                  <div
-                    key={g.id}
-                    onClick={() => navigate(`/challenge/group/${g.id}/result`)}
-                    className="relative rounded-2xl overflow-hidden cursor-pointer active:scale-[0.99] transition-transform"
-                    style={{
-                      opacity: mounted ? 1 : 0,
-                      transform: mounted ? "translateY(0)" : "translateY(10px)",
-                      transition: `all 0.4s ${0.55 + i * 0.06}s cubic-bezier(0.4,0,0.2,1)`,
-                      background: "#1A1D24",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                    }}
-                  >
-                    {g.cover && (
-                      <img src={g.cover} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" draggable={false} />
-                    )}
-                    <div className="absolute inset-0" style={{
-                      background: "linear-gradient(110deg, rgba(15,16,22,0.92) 0%, rgba(15,16,22,0.72) 60%, rgba(15,16,22,0.55) 100%)",
-                    }} />
-                    <div className="relative z-10 flex items-center gap-3 px-4 py-3.5">
-                      <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-[20px] shrink-0">🏆</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-black text-[14px] truncate">{g.title}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-white/55">
-                            {g.challengeEnd ? fmtDate(g.challengeEnd) : ""} 종료
-                          </span>
-                          <span className="text-[10px] font-black tabular-nums"
-                            style={{ color: achieved ? "#FF6680" : "#94A3B8" }}>
-                            크루 {ratePct}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Trophy className="w-3.5 h-3.5 text-white/40" />
-                        <ChevronRight className="w-4 h-4 text-white/40" />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
         {/* 설정 */}
         <div
           style={{
@@ -385,7 +237,7 @@ export function Profile() {
           <div className="rounded-2xl overflow-hidden bg-white dark:bg-[#12161E] border border-black/[0.04] dark:border-white/[0.07]">
             {[
               { icon: Bell,         bg: "bg-[#FFE8EC]", color: "text-[#FF3355]", label: "알림 설정",    onClick: () => guardAction(() => navigate("/settings/notifications")) },
-              { icon: Star,         bg: "bg-amber-50",  color: "text-amber-500", label: "리워드 & 배지", onClick: () => guardAction(() => navigate("/rewards")) },
+              { icon: Award,        bg: "bg-amber-50",  color: "text-amber-500", label: "등급",         onClick: () => guardAction(() => navigate("/rewards")) },
               { icon: UserPlus,     bg: "bg-sky-50",    color: "text-sky-500",   label: "친구 초대",    onClick: () => guardAction(() => navigate("/friends/invite")) },
             ].map(({ icon: Icon, bg, color, label, onClick }, i) => (
               <div key={label}>
