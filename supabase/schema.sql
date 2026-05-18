@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   avatar_url       TEXT,
   plan_type        TEXT DEFAULT 'free' CHECK (plan_type IN ('free', 'premium')),
   streak_count     INT  DEFAULT 0,
-  recovery_tickets INT  DEFAULT 2,
+  participation_tickets INT  DEFAULT 5,
   xp_total         INT  DEFAULT 0,
   joined_group_ids TEXT[] DEFAULT '{}',
   invite_code      TEXT UNIQUE,

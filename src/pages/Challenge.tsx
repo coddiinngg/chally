@@ -1,11 +1,11 @@
 import { Search, Users, ChevronDown,
-         Activity, BookOpen, Apple, Sparkles, Trophy } from "lucide-react";
+         Activity, BookOpen, Apple, Sparkles, Trophy, Bell, BellRing } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { useApp } from "../contexts/AppContext";
 import { useGuestGuard } from "../contexts/GuestGuardContext";
-import { getPhase, shouldHide, canJoin, phaseLabel, isLateJoiner, daysSinceEnd } from "../lib/challengeUtils";
+import { getPhase, shouldHide, canJoin, phaseLabel, isLateJoiner, daysSinceEnd, canRequestReopenNotify } from "../lib/challengeUtils";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../lib/verifyTypes";
 import type { Group } from "../contexts/AppContext";
 import { useScrollRestoration, isReturningVisit, usePersistedState } from "../lib/useScrollRestoration";
@@ -118,7 +118,8 @@ export function Challenge() {
   const location = useLocation();
   const {
     groups, groupsLoading, joinGroup, leaveGroup, setSelectedGroupId,
-    refreshGroups, confirmedEndedIds, confirmEndedGroup,
+    refreshGroups, confirmedEndedIds, confirmEndedGroup, participationTickets,
+    reopenNotifyIds, toggleReopenNotify,
   } = useApp();
   const { guardAction } = useGuestGuard();
   const [activeCat, setActiveCat] = usePersistedState<string>("ch-cat", "전체");
@@ -188,12 +189,13 @@ export function Challenge() {
         if (g.joined && confirmedEndedIds.has(g.id) && daysSinceEnd(g.challengeEnd) > 3) return false;
         // 참여했던 그룹: 확인 전 또는 3일 이내 → 표시
         if (g.joined) return true;
-        // 미참여 종료 챌린지 → 숨김
+        // 미참여 종료 챌린지: 5일 이내 → 재개설 알림 신청용으로 표시
+        if (canRequestReopenNotify(phase, g.challengeEnd)) return true;
         return false;
       }
 
-      // 마감임박 shouldHide (미참여만 적용)
-      if (!g.joined && shouldHide(phase, g.crewRate)) return false;
+      // 마감임박 shouldHide (미참여만): 알림 신청 가능 단계라면 카드는 노출
+      if (!g.joined && shouldHide(phase, g.crewRate) && !canRequestReopenNotify(phase, g.challengeEnd)) return false;
 
       return true;
     })
@@ -365,18 +367,21 @@ export function Challenge() {
             const isEnded = phase === "ended";
             const isConfirmed = confirmedEndedIds.has(id);
 
-            // 카드 클릭 가능 여부: 강퇴/탈퇴됨은 불가
-            const isClickable = !g.isRemoved && !g.isLeft;
+            // 강퇴/탈퇴는 조회만 가능 — 약간 흐릿하게 표시하되 진입은 허용
+            const isInactive = g.isRemoved || g.isLeft;
+
+            const canNotifyReopen = canRequestReopenNotify(phase, g.challengeEnd) && !!g.dbId;
+            const notifyOn = !!g.dbId && reopenNotifyIds.has(g.dbId);
 
             return (
               <div
                 key={id}
                 className={cn(
-                  "bg-white rounded-2xl border border-black/[0.04] overflow-hidden transition-all duration-150",
-                  !isClickable ? "opacity-55 cursor-default" : "active:scale-[0.99] cursor-pointer"
+                  "bg-white rounded-2xl border border-black/[0.04] overflow-hidden transition-all duration-150 active:scale-[0.99] cursor-pointer",
+                  isInactive && "opacity-70"
                 )}
                 style={{ ...slide(i * 55 + 200), boxShadow: "0 2px 8px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)" }}
-                onClick={() => { if (isClickable) navigate(`/challenge/group/${id}`); }}
+                onClick={() => navigate(`/challenge/group/${id}`)}
               >
                 <div className="block p-4 pb-3">
                   {/* 상단: 카테고리 + 상태 + 참여중 */}
@@ -468,14 +473,14 @@ export function Challenge() {
 
                   /* 강퇴됨 */
                   ) : g.isRemoved ? (
-                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-300 text-center">
-                      🚪 퇴장된 그룹
+                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-400 text-center">
+                      🚪 퇴장됨 · 조회만 가능
                     </div>
 
                   /* 탈퇴됨 (영구 — 재참여 불가) */
                   ) : g.isLeft ? (
-                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-300 text-center">
-                      🚪 탈퇴됨
+                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-400 text-center">
+                      👋 탈퇴됨 · 조회만 가능
                     </div>
 
                   /* 참여 가능 → 참여하기 */
@@ -496,6 +501,34 @@ export function Challenge() {
                     <div className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-300 text-center">
                       {phase === "ended" ? "종료된 챌린지" : phase === "recruit" ? "모집 준비중" : "참가 불가"}
                     </div>
+                  )}
+
+                  {/* 재개설 알림 신청 (마감임박 + 종료 후 5일 이내) */}
+                  {canNotifyReopen && g.dbId && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        guardAction(() => toggleReopenNotify(g.dbId!));
+                      }}
+                      className={cn(
+                        "w-full mt-1 py-1 rounded-lg text-[12px] font-bold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5",
+                        notifyOn
+                          ? "text-[#FF3355] bg-[#FFF0F3]"
+                          : "text-slate-500 active:bg-slate-50",
+                      )}
+                    >
+                      {notifyOn ? (
+                        <>
+                          <BellRing className="w-3.5 h-3.5" />
+                          재개설 알림 신청됨
+                        </>
+                      ) : (
+                        <>
+                          <Bell className="w-3.5 h-3.5" />
+                          재개설 알림 신청
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
               </div>
@@ -566,8 +599,17 @@ export function Challenge() {
                 </p>
               </div>
             )}
+            {participationTickets <= 0 && (
+              <div className="mb-4 px-4 py-3 bg-rose-50 rounded-2xl border border-rose-100">
+                <p className="text-[12px] text-rose-700 font-semibold leading-snug">
+                  보유한 참가권이 없어요. 다른 챌린지를 완수해서 참가권을 모아보세요.
+                </p>
+              </div>
+            )}
             <div className="h-px bg-slate-100 mb-5" />
-            <p className="text-[14px] text-slate-500 text-center mb-5">이 그룹에 참여할까요?</p>
+            <p className="text-[14px] text-slate-500 text-center mb-5">
+              {participationTickets > 0 ? `참가권 1장을 사용해 참여할까요? (보유 ${participationTickets}장)` : "이 그룹에 참여할까요?"}
+            </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setJoinTarget(null)}
@@ -576,8 +618,9 @@ export function Challenge() {
                 취소
               </button>
               <button
+                disabled={participationTickets <= 0}
                 onClick={() => { joinGroup(joinTarget.id); setSelectedGroupId(joinTarget.id); setJoinTarget(null); navigate("/"); }}
-                className="flex-[2] py-3.5 rounded-2xl text-white text-[14px] font-bold active:opacity-90 transition-opacity"
+                className="flex-[2] py-3.5 rounded-2xl text-white text-[14px] font-bold active:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed disabled:active:opacity-40"
                 style={{ background: "linear-gradient(115deg,#FF5C7A,#FF3355)", boxShadow: "0 6px 16px -4px rgba(255,51,85,0.45)" }}
               >
                 참여하기

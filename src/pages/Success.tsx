@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Share2, ArrowRight, Loader2 } from "lucide-react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../lib/verifyTypes";
@@ -37,6 +37,8 @@ function Confetti({ dots }: { dots: Dot[] }) {
 export function Success() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const demoMode = searchParams.get("demo") === "1";
   const { verifyType, verificationImageUrl, groups, completeCurrentVerification, nickname } = useApp();
   const { profile } = useAuth();
   const serverPhotoUrl = (location.state as { photoUrl?: string | null } | null)?.photoUrl;
@@ -44,14 +46,28 @@ export function Success() {
   const [shareState, setShareState] = useState<"idle" | "sharing" | "done">("idle");
   const [showShareCard, setShowShareCard] = useState(false);
 
+  // Demo 모드: 더미 사진 + 더미 챌린지
+  const demoSeed = React.useMemo(() => Math.floor(Math.random() * 1000), []);
+  const demoPhotoUrl = `https://picsum.photos/seed/chally-success-${demoSeed}/720/960`;
+
   // completeCurrentVerification()이 clearVerification()을 호출해 verifyType이 null이 되므로
   // 마운트 시점의 값을 미리 캡처
-  const [capturedKey] = useState<VerifyTypeKey>(() => (verifyType as VerifyTypeKey) ?? "step_walk");
-  const [capturedImageUrl] = useState<string | null>(() => serverPhotoUrl ?? verificationImageUrl);
-  const [capturedGroup] = useState(() => groups.find(g => g.verifyType === ((verifyType as VerifyTypeKey) ?? "step_walk")) ?? null);
+  const [capturedKey] = useState<VerifyTypeKey>(() => {
+    if (demoMode) return "run_scenery";
+    return (verifyType as VerifyTypeKey) ?? "step_walk";
+  });
+  const [capturedImageUrl] = useState<string | null>(() => {
+    if (demoMode) return demoPhotoUrl;
+    return serverPhotoUrl ?? verificationImageUrl;
+  });
+  const [capturedGroup] = useState(() => {
+    if (demoMode) return null;
+    return groups.find(g => g.verifyType === ((verifyType as VerifyTypeKey) ?? "step_walk")) ?? null;
+  });
 
   // 공유 카드 편집 설정 — ShareCard에서 제목/다크모드 변경 시 동기화
   const [cardTitle, setCardTitle] = useState(() => {
+    if (demoMode) return "아침 러닝 30분";
     const vt0 = VERIFY_TYPES[(verifyType as VerifyTypeKey) ?? "step_walk"];
     const grp  = groups.find(g => g.verifyType === ((verifyType as VerifyTypeKey) ?? "step_walk")) ?? null;
     return grp?.title ?? vt0?.label ?? "";
@@ -62,6 +78,7 @@ export function Success() {
 
   // 로컬 상태 완료 처리 (한 번만) — DB 저장은 Edge Function이 이미 완료
   useEffect(() => {
+    if (demoMode) return;
     completeCurrentVerification(serverPhotoUrl);
     invalidateFeedCache();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,9 +142,12 @@ export function Success() {
     }
   }
 
+  // 스트릭 (데모: 7일, 실제: profile.streak_count)
+  const streakCount = demoMode ? 7 : (profile?.streak_count ?? 0);
+
   return (
     <>
-    <div className="flex flex-col h-full bg-[#F5F6FA] relative overflow-hidden">
+    <div className="flex flex-col h-full bg-white relative overflow-hidden">
       <style>{`
         @keyframes confettiFall {
           0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
@@ -144,14 +164,65 @@ export function Success() {
           0%, 100% { box-shadow: 0 0 0 0 rgba(255,51,85,0.3); }
           50%       { box-shadow: 0 0 0 18px rgba(255,51,85,0); }
         }
+        @keyframes suc-float-a {
+          0%,100% { transform: translate(-20%, -15%) scale(1); }
+          50%     { transform: translate(-15%, -10%) scale(1.08); }
+        }
+        @keyframes suc-float-b {
+          0%,100% { transform: translate(20%, 25%) scale(1); }
+          50%     { transform: translate(15%, 20%) scale(1.1); }
+        }
+        @keyframes suc-float-c {
+          0%,100% { transform: translate(40%, -20%) scale(1); }
+          50%     { transform: translate(35%, -15%) scale(1.06); }
+        }
+        .suc-headline-grad {
+          background: linear-gradient(135deg,#FF3355 0%, #FF6680 50%, #FFA07A 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          color: transparent;
+          filter: drop-shadow(0 4px 16px rgba(255,51,85,0.25));
+        }
       `}</style>
+
+      {/* ── 데코 오로라 블롭 ── */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 360, height: 360, top: -120, left: -120,
+            background: "radial-gradient(circle, rgba(255,51,85,0.22) 0%, rgba(255,51,85,0) 70%)",
+            filter: "blur(20px)",
+            animation: "suc-float-a 9s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 420, height: 420, bottom: -160, right: -140,
+            background: "radial-gradient(circle, rgba(255,102,128,0.18) 0%, rgba(255,102,128,0) 70%)",
+            filter: "blur(24px)",
+            animation: "suc-float-b 11s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 260, height: 260, top: "40%", right: -100,
+            background: "radial-gradient(circle, rgba(255,160,122,0.14) 0%, rgba(255,160,122,0) 70%)",
+            filter: "blur(20px)",
+            animation: "suc-float-c 13s ease-in-out infinite",
+          }}
+        />
+      </div>
 
       <Confetti dots={dots} />
 
       {/* 닫기 */}
       <button
         onClick={() => navigate("/")}
-        className="absolute top-12 right-4 z-20 w-10 h-10 rounded-full bg-black/10 flex items-center justify-center text-slate-500 active:scale-90 transition-all text-lg"
+        className="absolute top-12 left-4 z-20 w-10 h-10 rounded-full bg-black/10 flex items-center justify-center text-slate-500 active:scale-90 transition-all text-lg"
       >
         ✕
       </button>
@@ -184,9 +255,27 @@ export function Success() {
           </div>
         </div>
 
+        {/* ── 스트릭 펄 (있을 때만) ── */}
+        {streakCount > 0 && (
+          <div
+            className="mb-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full"
+            style={{
+              ...slide(180),
+              background: "linear-gradient(135deg, rgba(255,51,85,0.12), rgba(255,160,122,0.10))",
+              border: "1px solid rgba(255,51,85,0.25)",
+              boxShadow: "0 4px 12px -4px rgba(255,51,85,0.2)",
+            }}
+          >
+            <span className="text-[14px] leading-none">🔥</span>
+            <span className="text-[12px] font-black tabular-nums" style={{ color: "#FF3355" }}>
+              {streakCount}일 연속 인증
+            </span>
+          </div>
+        )}
+
         {/* ── 헤드라인 ── */}
         <div className="text-center mb-5" style={slide(220)}>
-          <h1 className="text-[30px] font-black text-slate-900 leading-tight mb-1.5">
+          <h1 className="suc-headline-grad text-[34px] font-black leading-tight mb-1.5 tracking-tight">
             인증 완료! 🔥
           </h1>
           <p className="text-slate-500 text-[14px] leading-relaxed">
@@ -195,17 +284,21 @@ export function Success() {
           </p>
         </div>
 
-        {/* ── 인증 사진 (있을 때만) — 탭하면 공유 카드 열림 ── */}
+        {/* ── 인증 사진 (있을 때만) — 탭하면 공유 카드 열림. 잘리지 않도록 원본 비율 유지 ── */}
         {capturedImageUrl && (
           <div className="w-full max-w-sm mb-4" style={slide(300)}>
             <button
-              className="relative rounded-2xl overflow-hidden aspect-[4/3] w-full active:scale-[0.98] transition-transform"
+              className="relative rounded-2xl overflow-hidden w-full active:scale-[0.98] transition-transform block"
+              style={{
+                boxShadow: "0 24px 48px -16px rgba(255,51,85,0.32), 0 8px 16px -8px rgba(255,51,85,0.18)",
+                border: "1px solid rgba(255,51,85,0.12)",
+              }}
               onClick={() => setShowShareCard(true)}
             >
               <img
                 src={capturedImageUrl}
                 alt="인증 사진"
-                className="w-full h-full object-cover"
+                className="w-full h-auto block bg-slate-100"
               />
               {/* 오버레이 배지 */}
               <div
@@ -228,7 +321,7 @@ export function Success() {
       </div>
 
       {/* ── 하단 버튼 ── */}
-      <div className="shrink-0 px-6 pb-10 pt-3 bg-[#F5F6FA] relative z-10">
+      <div className="shrink-0 px-6 pb-10 pt-3 bg-white relative z-10">
         <button
           onClick={() => navigate("/")}
           className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl text-white font-bold text-[16px] active:scale-[0.98] transition-transform mb-3"

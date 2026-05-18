@@ -701,10 +701,10 @@ export function Onboarding() {
     if (nextNickname) {
       setNickname(nextNickname);
       if (user?.id) {
-        const { error } = await supabase
-          .from("profiles")
-          .update({ username: nextNickname })
-          .eq("id", user.id);
+        const { error } = await supabase.rpc("update_profile_basic", {
+          p_username: nextNickname,
+          p_avatar_url: null,
+        });
         if (!error) void refreshProfile();
       }
     }

@@ -16,7 +16,7 @@ export function invalidateFeedCache() {
   feedCacheTime = 0;
 }
 
-const REACTIONS = ["❤️", "🔥", "👍", "😮", "🎉"];
+const REACTIONS = ["❤️", "🔥", "👍", "😂", "😮", "🎉"];
 
 // ── 3열 그리드 카드 ──
 function FeedGridCard({ item, onClick }: { item: ActivityFeedItem; onClick: () => void }) {
@@ -92,7 +92,7 @@ function FeedViewerOverlay({
     reactionCache.set(postId, { count: nextCount, myReaction: nextEmoji });
     setPickerFor(null);
     const mutation = nextEmoji
-      ? supabase.from("activity_reactions").upsert({ activity_post_id: postId, user_id: userId, emoji: nextEmoji as "❤️" | "🔥" | "👍" | "😮" | "🎉" })
+      ? supabase.from("activity_reactions").upsert({ activity_post_id: postId, user_id: userId, emoji: nextEmoji as "❤️" | "🔥" | "👍" | "😂" | "😮" | "🎉" })
       : supabase.from("activity_reactions").delete().eq("activity_post_id", postId).eq("user_id", userId);
     const { error } = await mutation;
     if (error) {

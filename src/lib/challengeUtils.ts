@@ -1,11 +1,8 @@
 export type ChallengePhase = "recruit" | "active" | "closing" | "ended";
 
-/** 챌린지 기간(일수) → 마감임박 기준 (종료일 N일 전부터) */
-function closingDaysBefore(totalDays: number): number {
-  if (totalDays <= 7) return 3;
-  if (totalDays <= 14) return 4;
-  if (totalDays <= 21) return 5;
-  return 6;
+/** 챌린지 전체 기간의 50% 시점 (closing 시작 컷오프) */
+function closingStartAt(start: Date, end: Date): Date {
+  return new Date(start.getTime() + (end.getTime() - start.getTime()) / 2);
 }
 
 /** 현재 챌린지 단계 계산 */
@@ -23,13 +20,7 @@ export function getPhase(
   if (recruitEnd && now < new Date(recruitEnd)) return "recruit";
   if (now > end) return "ended";
 
-  const totalDays  = Math.round((end.getTime() - start.getTime()) / 86_400_000);
-  const dBefore    = closingDaysBefore(totalDays);
-  const closingStart = new Date(end);
-  closingStart.setDate(closingStart.getDate() - dBefore);
-  closingStart.setHours(0, 0, 0, 0); // D-4 당일 자정부터 마감임박
-
-  return now >= closingStart ? "closing" : "active";
+  return now >= closingStartAt(start, end) ? "closing" : "active";
 }
 
 /** 마감임박 상태에서 그룹 숨김 여부 */
@@ -45,7 +36,7 @@ export function canJoin(phase: ChallengePhase, crewRate: number): boolean {
   return true; // recruit(모집중) + active: 항상 참여 가능
 }
 
-/** 마감임박 시작일 이후에 합류한 늦은 참가자 여부 */
+/** 마감임박 시작(전체 기간 50% 경과) 이후에 합류한 늦은 참가자 여부 */
 export function isLateJoiner(
   challengeStart: string | null,
   challengeEnd: string | null,
@@ -54,11 +45,7 @@ export function isLateJoiner(
   if (!challengeStart || !challengeEnd) return false;
   const start = new Date(challengeStart);
   const end   = new Date(challengeEnd);
-  const totalDays  = Math.round((end.getTime() - start.getTime()) / 86_400_000);
-  const dBefore    = closingDaysBefore(totalDays);
-  const closingStart = new Date(end);
-  closingStart.setDate(closingStart.getDate() - dBefore);
-  return new Date(joinedAt) >= closingStart;
+  return new Date(joinedAt) >= closingStartAt(start, end);
 }
 
 /** 베네핏 등급 계산 (크루 달성률 선행 조건 포함) */
@@ -71,6 +58,16 @@ export function getBenefitGrade(
   if (myRate >= 80) return "B";
   if (myRate >= 50) return "C";
   return "D";
+}
+
+/** 등급별 참가권 지급 수량 */
+export function ticketsForGrade(grade: "A" | "B" | "C" | "D"): number {
+  switch (grade) {
+    case "A": return 3;
+    case "B": return 2;
+    case "C": return 1;
+    case "D": return 0;
+  }
 }
 
 /** 단계 → 표시 레이블 */
@@ -95,4 +92,14 @@ export function phaseColor(phase: ChallengePhase): string {
 export function daysSinceEnd(challengeEnd: string | null): number {
   if (!challengeEnd) return 0;
   return Math.floor((Date.now() - new Date(challengeEnd).getTime()) / 86_400_000);
+}
+
+/** 재개설 알림 신청 가능 여부: 마감임박 기간 OR 종료 후 5일 이내 */
+export function canRequestReopenNotify(
+  phase: ChallengePhase,
+  challengeEnd: string | null,
+): boolean {
+  if (phase === "closing") return true;
+  if (phase === "ended") return daysSinceEnd(challengeEnd) <= 5;
+  return false;
 }

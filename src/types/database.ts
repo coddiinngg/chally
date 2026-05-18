@@ -10,7 +10,7 @@ export interface Database {
           avatar_url: string | null;
           plan_type: 'free' | 'premium';
           streak_count: number;
-          recovery_tickets: number;
+          participation_tickets: number;
           xp_total: number;
           invite_code: string | null;
           referred_by: string | null;
@@ -23,12 +23,32 @@ export interface Database {
           avatar_url?: string | null;
           plan_type?: 'free' | 'premium';
           streak_count?: number;
-          recovery_tickets?: number;
+          participation_tickets?: number;
           xp_total?: number;
           invite_code?: string | null;
           referred_by?: string | null;
         };
         Update: Partial<Omit<Database['public']['Tables']['profiles']['Insert'], 'id'>>;
+        Relationships: [];
+      };
+      account_deletion_requests: {
+        Row: {
+          id: string;
+          user_id: string;
+          status: 'pending' | 'completed' | 'cancelled';
+          requested_at: string;
+          completed_at: string | null;
+          note: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          status?: 'pending' | 'completed' | 'cancelled';
+          requested_at?: string;
+          completed_at?: string | null;
+          note?: string | null;
+        };
+        Update: never;
         Relationships: [];
       };
       verifications: {
@@ -117,6 +137,7 @@ export interface Database {
           exit_deadline: string | null;
           removed_at: string | null;
           join_day: number;
+          benefit_claimed_at: string | null;
         };
         Insert: {
           id?: string;
@@ -129,8 +150,9 @@ export interface Database {
           exit_deadline?: string | null;
           removed_at?: string | null;
           join_day?: number;
+          benefit_claimed_at?: string | null;
         };
-        Update: Pick<Database['public']['Tables']['group_members']['Insert'], 'role' | 'member_status'>;
+        Update: Pick<Database['public']['Tables']['group_members']['Insert'], 'role' | 'member_status' | 'benefit_claimed_at'>;
         Relationships: [];
       };
       notifications: {
@@ -282,6 +304,21 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      challenge_reopen_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          group_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          group_id: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
       friend_invites: {
         Row: {
           id: string;
@@ -353,14 +390,14 @@ export interface Database {
         Row: {
           activity_post_id: string;
           user_id: string;
-          emoji: '❤️' | '🔥' | '👍' | '😮' | '🎉';
+          emoji: '❤️' | '🔥' | '👍' | '😂' | '😮' | '🎉';
           created_at: string;
           updated_at: string;
         };
         Insert: {
           activity_post_id: string;
           user_id: string;
-          emoji: '❤️' | '🔥' | '👍' | '😮' | '🎉';
+          emoji: '❤️' | '🔥' | '👍' | '😂' | '😮' | '🎉';
         };
         Update: Pick<Database['public']['Tables']['activity_reactions']['Insert'], 'emoji'>;
         Relationships: [];
@@ -405,6 +442,15 @@ export interface Database {
     };
     Views: Record<never, never>;
     Functions: {
+      claim_participation_benefit: {
+        Args: { p_group_id: string };
+        Returns: {
+          granted_tickets: number;
+          participation_tickets: number;
+          benefit_claimed_at: string;
+          already_claimed: boolean;
+        }[];
+      };
       get_crew_status: {
         Args: { p_group_id: string };
         Returns: {
@@ -459,6 +505,22 @@ export interface Database {
           }[];
         }[];
       };
+      join_group_with_ticket: {
+        Args: { p_group_id: string };
+        Returns: {
+          joined: boolean;
+          participation_tickets: number;
+          member_status: string;
+        }[];
+      };
+      leave_group: {
+        Args: { p_group_id: string };
+        Returns: boolean;
+      };
+      request_account_deletion: {
+        Args: Record<never, never>;
+        Returns: string;
+      };
       search_public_profiles: {
         Args: {
           p_query: string;
@@ -470,6 +532,13 @@ export interface Database {
           avatar_url: string | null;
         }[];
       };
+      update_profile_basic: {
+        Args: {
+          p_username: string | null;
+          p_avatar_url: string | null;
+        };
+        Returns: void;
+      };
     };
     Enums: Record<never, never>;
     CompositeTypes: Record<never, never>;
@@ -478,6 +547,7 @@ export interface Database {
 
 // 편의 타입
 export type Profile    = Database['public']['Tables']['profiles']['Row'];
+export type AccountDeletionRequest = Database['public']['Tables']['account_deletion_requests']['Row'];
 export type Verification = Database['public']['Tables']['verifications']['Row'];
 export type Group      = Database['public']['Tables']['groups']['Row'];
 export type GroupMember = Database['public']['Tables']['group_members']['Row'];

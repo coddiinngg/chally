@@ -121,34 +121,35 @@ export function ShareCard({ imageUrl, defaultTitle, onClose, onSave }: Props) {
         </button>
       </div>
 
-      {/* ── title ── */}
-      <div className="shrink-0 px-6 pb-3 flex items-center justify-center gap-2">
-        {editing ? (
-          <input
-            ref={inputRef}
-            autoFocus
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            onBlur={() => setEditing(false)}
-            onKeyDown={e => e.key === "Enter" && setEditing(false)}
-            maxLength={30}
-            className="text-center font-black text-[20px] bg-transparent border-b-2 border-[#FF3355] outline-none w-full max-w-[260px]"
-            style={{ color: isDark ? "#FFFFFF" : "#111111" }}
-          />
-        ) : (
-          <button
-            onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 60); }}
-            className="font-black text-[20px] active:opacity-70 transition-opacity"
-            style={{ color: isDark ? "#FFFFFF" : "#111111" }}
-          >
-            {title}
-          </button>
-        )}
-      </div>
+      {/* ── 사진 + 제목 + 아이디 (한 묶음으로 화면 중앙 정렬) ── */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-hidden">
+        {/* title */}
+        <div className="shrink-0 mb-3 w-full flex items-center justify-center gap-2">
+          {editing ? (
+            <input
+              ref={inputRef}
+              autoFocus
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              onBlur={() => setEditing(false)}
+              onKeyDown={e => e.key === "Enter" && setEditing(false)}
+              maxLength={30}
+              className="text-center font-black text-[28px] tracking-tight bg-transparent border-b-2 border-[#FF3355] outline-none w-full max-w-[320px]"
+              style={{ color: isDark ? "#FFFFFF" : "#111111" }}
+            />
+          ) : (
+            <button
+              onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 60); }}
+              className="font-black text-[28px] tracking-tight leading-tight active:opacity-70 transition-opacity text-center"
+              style={{ color: isDark ? "#FFFFFF" : "#111111" }}
+            >
+              {title}
+            </button>
+          )}
+        </div>
 
-      {/* ── photo ── */}
-      <div className="flex-1 flex items-center justify-center px-4 overflow-hidden">
-        <div className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl">
+        {/* photo */}
+        <div className="shrink-0 w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl">
           <img
             src={imageUrl}
             alt="인증 사진"
@@ -156,13 +157,13 @@ export function ShareCard({ imageUrl, defaultTitle, onClose, onSave }: Props) {
             draggable={false}
           />
         </div>
-      </div>
 
-      {/* ── @username ── */}
-      <div className="shrink-0 flex items-center justify-center pb-10 pt-2">
-        <span className="text-[15px] font-semibold" style={{ color: isDark ? "rgba(255,255,255,0.65)" : "rgba(0,0,0,0.55)" }}>
-          @{username}
-        </span>
+        {/* @username */}
+        <div className="shrink-0 mt-3 flex items-center justify-center">
+          <span className="text-[18px] font-bold tracking-tight" style={{ color: isDark ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.65)" }}>
+            @{username}
+          </span>
+        </div>
       </div>
     </div>
   );

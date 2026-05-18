@@ -18,9 +18,10 @@ interface ActivityPhotoState {
   reactionCount?: number;
   myReaction?: string | null;
   avatarUrl?: string | null;
+  canReact?: boolean;
 }
 
-const REACTIONS: ActivityEmoji[] = ["❤️", "🔥", "👍", "😮", "🎉"];
+const REACTIONS: ActivityEmoji[] = ["❤️", "🔥", "👍", "😂", "😮", "🎉"];
 
 export function ActivityPhoto() {
   const navigate = useNavigate();
@@ -31,7 +32,9 @@ export function ActivityPhoto() {
   const [likeCount, setLikeCount]   = useState(state?.reactionCount ?? 0);
   const [showPicker, setShowPicker] = useState(false);
   const [noPostToast, setNoPostToast] = useState(false);
+  const [blockedToast, setBlockedToast] = useState(false);
   const noPostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blockedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (!state) {
     navigate(-1);
@@ -39,8 +42,17 @@ export function ActivityPhoto() {
   }
 
   const { postId, userId, imgSrc, grad, name, seed, time, msg, avatarUrl } = state;
+  const canReact = state.canReact !== false;
+
+  function showBlocked() {
+    setShowPicker(false);
+    setBlockedToast(true);
+    if (blockedTimerRef.current) clearTimeout(blockedTimerRef.current);
+    blockedTimerRef.current = setTimeout(() => setBlockedToast(false), 2500);
+  }
 
   async function handleReact(emoji: ActivityEmoji) {
+    if (!canReact) { showBlocked(); return; }
     if (!postId) {
       setShowPicker(false);
       setNoPostToast(true);
@@ -156,12 +168,13 @@ export function ActivityPhoto() {
               </div>
             )}
             <button
-              onClick={() => setShowPicker(v => !v)}
+              onClick={() => canReact ? setShowPicker(v => !v) : showBlocked()}
               className="flex items-center gap-2 px-4 py-2.5 rounded-2xl transition-all active:scale-95"
               style={{
                 background: liked ? "rgba(255,51,85,0.5)" : "rgba(255,255,255,0.15)",
                 backdropFilter: "blur(8px)",
                 border: liked ? "1px solid rgba(255,51,85,0.6)" : "1px solid rgba(255,255,255,0.2)",
+                opacity: canReact ? 1 : 0.55,
               }}
             >
               <span className="text-[20px] leading-none">{liked ?? "👍"}</span>
@@ -178,6 +191,13 @@ export function ActivityPhoto() {
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 rounded-2xl text-white text-[13px] font-semibold pointer-events-none whitespace-nowrap z-50"
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", animation: "ap-up 0.2s ease both" }}>
           리액션을 남길 수 없는 게시물이에요
+        </div>
+      )}
+
+      {blockedToast && (
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 rounded-2xl text-white text-[13px] font-semibold pointer-events-none whitespace-nowrap z-50"
+          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", animation: "ap-up 0.2s ease both" }}>
+          그룹에서 나간 상태라 리액션을 남길 수 없어요
         </div>
       )}
 

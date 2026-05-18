@@ -1458,7 +1458,7 @@ function FeedCard({ item, onTap }: { item: FeedItem; onTap: () => void; key?: Re
   );
 }
 
-const FEED_REACTIONS: ActivityEmoji[] = ["❤️", "🔥", "👍", "😮", "🎉"];
+const FEED_REACTIONS: ActivityEmoji[] = ["❤️", "🔥", "👍", "😂", "😮", "🎉"];
 
 function FeedViewer({
   items,

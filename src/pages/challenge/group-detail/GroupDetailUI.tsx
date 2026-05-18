@@ -131,6 +131,8 @@ export function GroupDetailUI() {
 
   const groupDbId = group?.dbId ?? null;
   const phase = getPhase(group?.challengeStart ?? null, group?.challengeEnd ?? null, group?.recruitEnd ?? null);
+  // 조회 전용 상태 (REMOVED/LEFT) — 리액션 등 액션 차단용
+  const isViewerOnly = !!(group?.isRemoved || group?.isLeft || crewStatus?.my_status === "REMOVED");
 
   // 챌린지 시작 안내 배너: 참여중이고 오늘이 챌린지 시작일인 경우
   useEffect(() => {
@@ -258,9 +260,9 @@ export function GroupDetailUI() {
       const status = data[0] as CrewStatus;
       setCrewStatus(status);
       crewStatusCache.set(groupDbId, status);
-      if (status.my_status === "REMOVED") {
+      // REMOVED 감지: AppContext 동기화만 수행. 페이지는 유지(조회만 가능 상태로 전환됨).
+      if (status.my_status === "REMOVED" && !group?.isRemoved) {
         markGroupLeft(groupDbId);
-        navigate("/challenge", { replace: true, state: { removedGroupId: groupDbId } });
       }
     }
     void loadCrewStatus();
@@ -488,6 +490,24 @@ export function GroupDetailUI() {
           </div>
         </section>
 
+        {/* ── 퇴장/탈퇴 상태 배너 (조회 전용 안내) ── */}
+        {(group.isRemoved || group.isLeft || crewStatus?.my_status === "REMOVED") && (
+          <div className="mx-4 mt-4 rounded-2xl overflow-hidden bg-slate-50 border border-slate-200"
+            style={{ animation: "noti-drop 0.3s ease both" }}>
+            <div className="px-4 py-3.5 flex items-start gap-3">
+              <span className="text-[20px] mt-0.5 shrink-0">{group.isRemoved || crewStatus?.my_status === "REMOVED" ? "🚪" : "👋"}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-slate-700 font-black text-[13px] mb-0.5">
+                  {group.isRemoved || crewStatus?.my_status === "REMOVED" ? "이 그룹에서 퇴장됐어요" : "이 그룹에서 탈퇴했어요"}
+                </p>
+                <p className="text-slate-500 text-[12px] leading-relaxed">
+                  챌린지 진행은 볼 수 있지만, 인증·리액션·재참여는 할 수 없어요.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── 챌린지 시작 안내 배너 ── */}
         {showStartBanner && (
           <div className="mx-4 mt-4 rounded-2xl overflow-hidden"
@@ -693,6 +713,7 @@ export function GroupDetailUI() {
                                 time: new Date(v.verified_at).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }),
                                 msg: "내 인증 사진",
                                 type: "verify",
+                                canReact: !isViewerOnly,
                               },
                             })}
                           >
@@ -839,7 +860,7 @@ export function GroupDetailUI() {
                       const imgSrc = item.photoUrl ?? undefined;
                       return (
                         <ActivityCard key={item.id ?? i} item={item} imgSrc={imgSrc}
-                          aspect={i === 0 ? "tall" : "square"} mounted={mounted} delay={i * 80} groupId={groupId} />
+                          aspect={i === 0 ? "tall" : "square"} mounted={mounted} delay={i * 80} groupId={groupId} canReact={!isViewerOnly} />
                       );
                     })}
                   </div>
@@ -848,7 +869,7 @@ export function GroupDetailUI() {
                       const imgSrc = item.photoUrl ?? undefined;
                       return (
                         <ActivityCard key={item.id ?? i} item={item} imgSrc={imgSrc}
-                          aspect={i === 0 ? "square" : "tall"} mounted={mounted} delay={i * 80 + 40} groupId={groupId} />
+                          aspect={i === 0 ? "square" : "tall"} mounted={mounted} delay={i * 80 + 40} groupId={groupId} canReact={!isViewerOnly} />
                       );
                     })}
                   </div>
@@ -910,8 +931,8 @@ export function GroupDetailUI() {
 
       {/* ── FAB: 단일 주요 액션 ── */}
       <div className="shrink-0 px-4 pb-8 pt-3 bg-[#F2F2F7] border-t border-black/[0.04]">
-        {/* 참여중 + 종료됨 → 결과 확인하기 */}
-        {group.joined && phase === "ended" ? (
+        {/* 종료됨 + (참여중이었거나/REMOVED/LEFT) → 결과 확인하기 */}
+        {phase === "ended" && (group.joined || group.isRemoved || group.isLeft || crewStatus?.my_status === "REMOVED") ? (
           <button
             onClick={() => navigate(`/challenge/group/${groupId}/result`)}
             className="w-full h-14 flex items-center justify-center gap-2.5 rounded-2xl text-white font-black text-[16px] active:scale-[0.98] transition-transform"
@@ -920,18 +941,18 @@ export function GroupDetailUI() {
             결과 확인하기
           </button>
 
-        /* 강퇴됨 */
-        ) : crewStatus?.my_status === "REMOVED" ? (
+        /* 강퇴됨 (진행 중) */
+        ) : crewStatus?.my_status === "REMOVED" || group.isRemoved ? (
           <div className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-slate-100 border border-black/[0.06]">
             <span className="text-[15px]">🚪</span>
-            <span className="text-[15px] font-black text-slate-400">퇴장된 그룹이에요</span>
+            <span className="text-[15px] font-black text-slate-400">퇴장됨 · 조회만 가능</span>
           </div>
 
         /* 탈퇴됨 (영구 — 재참여 불가) */
         ) : group.isLeft ? (
           <div className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-slate-100 border border-black/[0.06]">
             <span className="text-[15px]">👋</span>
-            <span className="text-[15px] font-black text-slate-400">탈퇴한 그룹이에요</span>
+            <span className="text-[15px] font-black text-slate-400">탈퇴됨 · 조회만 가능</span>
           </div>
 
         /* 비참여 + 종료됨 */
@@ -1162,10 +1183,10 @@ export function GroupDetailUI() {
 }
 
 function ActivityCard({
-  item, imgSrc, aspect, mounted, delay, groupId,
+  item, imgSrc, aspect, mounted, delay, groupId, canReact = true,
 }: {
   item: ActivityItem; imgSrc?: string; aspect: "tall" | "square";
-  mounted: boolean; delay: number; groupId: string; key?: React.Key;
+  mounted: boolean; delay: number; groupId: string; canReact?: boolean; key?: React.Key;
 }) {
   const navigate = useNavigate();
   const typeEmoji = item.type === "verify" ? "📸" : item.type === "streak" ? "🔥" : item.type === "rank" ? "🏆" : "💬";
@@ -1194,6 +1215,7 @@ function ActivityCard({
           type: item.type,
           reactionCount: item.reactionCount,
           myReaction: item.myReaction,
+          canReact,
         },
       })}
     >

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Bell, LogOut, Ticket, Pencil, ChevronRight, Award, UserPlus, Moon, Sun, Smartphone } from "lucide-react";
+import { Bell, LogOut, Ticket, Pencil, ChevronRight, Award, UserPlus, Moon, Sun, Smartphone, Trash2, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useGuestGuard } from "../contexts/GuestGuardContext";
 import { getGrade, getNextGrade } from "../lib/grades";
 import { useScrollRestoration, isReturningVisit } from "../lib/useScrollRestoration";
+import { supabase } from "../lib/supabase";
 
 function useCountUp(target: number, duration = 900, delay = 400) {
   const [val, setVal] = useState(0);
@@ -44,11 +45,15 @@ function StatBadge({ label, targetVal, suffix, delay }: { label: string; targetV
 
 export function Profile() {
   const navigate = useNavigate();
-  const { nickname, theme, setTheme, recoveryTickets, verificationHistory, groupsLoading } = useApp();
+  const { nickname, theme, setTheme, participationTickets, verificationHistory, groupsLoading } = useApp();
   const { signOut, profile } = useAuth();
   const { guardAction } = useGuestGuard();
   const [mounted, setMounted] = useState(() => isReturningVisit("pf-scroll"));
   const [signOutError, setSignOutError] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteRequested, setDeleteRequested] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   useScrollRestoration("pf-scroll", scrollRef, !groupsLoading);
   const xpTotal = profile?.xp_total ?? 0;
@@ -77,12 +82,33 @@ export function Profile() {
     return () => clearTimeout(t);
   }, []);
 
+  async function requestAccountDeletion() {
+    if (deleteLoading) return;
+    setDeleteLoading(true);
+    setDeleteError("");
+    const { error } = await supabase.rpc("request_account_deletion");
+    setDeleteLoading(false);
+    if (error) {
+      setDeleteError(error.message);
+      return;
+    }
+    setShowDeleteConfirm(false);
+    setDeleteRequested(true);
+    setTimeout(() => setDeleteRequested(false), 3500);
+  }
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-[#FAFAFA] dark:bg-[#090B10] relative">
       {signOutError && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl text-white text-[13px] font-semibold pointer-events-none whitespace-nowrap"
           style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}>
           로그아웃에 실패했어요. 다시 시도해주세요.
+        </div>
+      )}
+      {deleteRequested && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl text-white text-[13px] font-semibold pointer-events-none whitespace-nowrap"
+          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}>
+          계정 삭제 요청이 접수됐어요.
         </div>
       )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
@@ -215,7 +241,7 @@ export function Profile() {
           <div className="relative z-10">
             <p className="text-[11px] text-slate-400 mb-1">보유한 참가권</p>
             <div className="flex items-baseline gap-1">
-              <span className="text-[36px] font-black text-slate-900 dark:text-white leading-none tabular-nums">{recoveryTickets}</span>
+              <span className="text-[36px] font-black text-slate-900 dark:text-white leading-none tabular-nums">{participationTickets}</span>
               <span className="text-[14px] text-slate-400 ml-1 font-semibold">개</span>
             </div>
             <p className="text-[11px] text-slate-400 mt-1.5">그룹 참가 시 사용</p>
@@ -296,6 +322,16 @@ export function Profile() {
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 ml-1 mb-2 mt-5">계정</p>
           <div className="rounded-2xl overflow-hidden bg-white dark:bg-[#12161E] border border-black/[0.04] dark:border-white/[0.07]">
             <button
+              onClick={() => guardAction(() => setShowDeleteConfirm(true))}
+              className="w-full flex items-center gap-3 px-4 py-3.5 active:bg-rose-50 dark:active:bg-white/[0.04] transition-colors"
+            >
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-rose-50 dark:bg-rose-950/30">
+                <Trash2 className="w-4 h-4 text-rose-500" />
+              </div>
+              <span className="flex-1 text-left text-[14px] font-semibold text-rose-500">계정 삭제 요청</span>
+            </button>
+            <div className="h-px bg-slate-100 dark:bg-white/[0.06] mx-4" />
+            <button
               onClick={async () => {
                 try {
                   await signOut();
@@ -318,6 +354,54 @@ export function Profile() {
         <p className="text-center text-[11px] text-slate-300 pb-2">챌리 v1.0.0</p>
       </div>
       </div>
+
+      {showDeleteConfirm && (
+        <div
+          className="absolute inset-0 z-[120] flex items-end"
+          style={{ background: "rgba(0,0,0,0.5)" }}
+          onClick={() => !deleteLoading && setShowDeleteConfirm(false)}
+        >
+          <div
+            className="w-full rounded-t-3xl bg-white dark:bg-[#12161E] px-5 pt-5"
+            style={{ paddingBottom: "max(2.5rem, env(safe-area-inset-bottom))", boxShadow: "0 -8px 40px rgba(0,0,0,0.16)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-9 h-1 rounded-full bg-slate-200 dark:bg-white/10 mx-auto mb-5" />
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-11 h-11 rounded-2xl bg-rose-50 dark:bg-rose-950/30 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-500" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-[18px] font-black text-slate-900 dark:text-white">계정 삭제를 요청할까요?</h3>
+                <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  요청이 접수되면 운영자가 계정과 관련 데이터를 확인 후 삭제 처리합니다. 처리 전까지는 같은 계정으로 계속 로그인할 수 있어요.
+                </p>
+              </div>
+            </div>
+            {deleteError && (
+              <p className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-[12px] font-semibold text-rose-500">
+                {deleteError}
+              </p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleteLoading}
+                className="flex-1 py-3.5 rounded-2xl bg-slate-100 dark:bg-white/[0.06] text-slate-500 dark:text-slate-300 text-[14px] font-bold disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={requestAccountDeletion}
+                disabled={deleteLoading}
+                className="flex-[1.5] py-3.5 rounded-2xl bg-rose-500 text-white text-[14px] font-bold disabled:opacity-60"
+              >
+                {deleteLoading ? "요청 중..." : "삭제 요청"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

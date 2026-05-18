@@ -4,7 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 
-const TERMS_CONTENT = `챌리(Chally) 서비스 이용약관
+export const TERMS_CONTENT = `챌리(Chally) 서비스 이용약관
 
 제1조 (목적)
 
@@ -87,9 +87,9 @@ const TERMS_CONTENT = `챌리(Chally) 서비스 이용약관
 
 부칙
 
-본 약관은 런칭일부터 시행합니다.`;
+본 약관은 2026년 5월 16일부터 시행합니다.`;
 
-const PRIVACY_CONTENT = `챌리(Chally) 개인정보처리방침
+export const PRIVACY_CONTENT = `챌리(Chally) 개인정보처리방침
 
 챌리(Chally)(이하 "회사")는 이용자의 개인정보를 중요하게 생각하며, 「개인정보 보호법」 등 관련 법령을 준수합니다. 회사는 이용자의 개인정보를 안전하게 보호하고, 관련 고충을 신속하고 원활하게 처리하기 위하여 다음과 같이 개인정보처리방침을 수립·공개합니다.
 
@@ -194,8 +194,8 @@ const PRIVACY_CONTENT = `챌리(Chally) 개인정보처리방침
 
 회사는 개인정보 처리에 관한 업무를 총괄하여 책임지고, 개인정보 처리와 관련한 이용자의 불만 처리 및 피해 구제를 위하여 개인정보 보호책임자를 지정합니다.
 
-- 개인정보 보호책임자: [담당자명]
-- 이메일: [이메일 주소]
+- 개인정보 보호책임자: 챌리 운영팀
+- 이메일: privacy@chally.app
 
 제11조 (개인정보처리방침의 변경)
 
@@ -203,7 +203,7 @@ const PRIVACY_CONTENT = `챌리(Chally) 개인정보처리방침
 
 부칙
 
-본 개인정보처리방침은 런칭일부터 시행합니다.`;
+본 개인정보처리방침은 2026년 5월 16일부터 시행합니다.`;
 
 function LegalModal({ title, content, onClose }: { title: string; content: string; onClose: () => void }) {
   return (

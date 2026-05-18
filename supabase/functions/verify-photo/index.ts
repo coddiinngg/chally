@@ -6,7 +6,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") ?? "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -244,34 +244,29 @@ interface VerificationGroup {
 const SERVER_VALIDATORS: Partial<Record<VerifyTypeKey, (obj: Record<string, unknown>) => string | null>> = {
   step_walk: (obj) => {
     const steps = typeof obj.stepsRead === "number" ? Math.round(obj.stepsRead) : null;
-    console.log(`[verify-photo] step_walk stepsRead=${obj.stepsRead}, parsed=${steps}`);
     if (steps === null) return "걸음 수 숫자를 사진에서 직접 읽을 수 없어 인증이 거절됐습니다.";
     if (steps < 5000) return `읽힌 걸음 수(${steps.toLocaleString()}보)가 5,000보 미만입니다.`;
     return null;
   },
   quote_photo: (obj) => {
     const text = typeof obj.textRead === "string" ? obj.textRead.trim() : null;
-    console.log(`[verify-photo] quote_photo textRead=${JSON.stringify(text)}`);
     if (!text || text.length < 5) return "텍스트를 사진에서 직접 읽을 수 없어 인증이 거절됐습니다.";
     return null;
   },
   book_cover: (obj) => {
     const title = typeof obj.titleRead === "string" ? obj.titleRead.trim() : null;
     const author = typeof obj.authorRead === "string" ? obj.authorRead.trim() : null;
-    console.log(`[verify-photo] book_cover titleRead=${JSON.stringify(title)}, authorRead=${JSON.stringify(author)}`);
     if (!title) return "책 제목을 사진에서 직접 읽을 수 없어 인증이 거절됐습니다.";
     if (!author) return "저자명을 사진에서 직접 읽을 수 없어 인증이 거절됐습니다.";
     return null;
   },
   run_scenery: (obj) => {
     const evidence = typeof obj.runEvidenceRead === "string" ? obj.runEvidenceRead.trim() : null;
-    console.log(`[verify-photo] run_scenery runEvidenceRead=${JSON.stringify(evidence)}`);
     if (!evidence || evidence.length < 5) return "러닝 증거(앱·복장·장비 등)를 사진에서 확인할 수 없어 인증이 거절됐습니다.";
     return null;
   },
   location_photo: (obj) => {
     const landmark = typeof obj.landmarkRead === "string" ? obj.landmarkRead.trim() : null;
-    console.log(`[verify-photo] location_photo landmarkRead=${JSON.stringify(landmark)}`);
     if (!landmark || landmark.length < 2) return "장소를 특정할 수 있는 고유한 특징(간판·건물명)을 확인할 수 없어 인증이 거절됐습니다.";
     return null;
   },
@@ -522,11 +517,9 @@ serve(async (req) => {
 
   // thinking 모델은 parts 중 thought:true 부분 제외하고 실제 텍스트만 추출
   const parts = geminiData.candidates?.[0]?.content?.parts ?? [];
-  console.log("[verify-photo] Gemini full response:", JSON.stringify(geminiData).slice(0, 800));
   const text = parts.find(p => !p.thought && typeof p.text === "string")?.text?.trim()
     ?? parts[0]?.text?.trim()
     ?? "";
-  console.log("[verify-photo] Gemini raw text:", text.slice(0, 300));
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   let result: VerifyResult;
   try {

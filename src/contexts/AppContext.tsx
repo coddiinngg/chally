@@ -72,7 +72,7 @@ function mapDbGroup(
 }
 
 /* ── 알림 타입 ── */
-export type NotifType = "goal" | "badge" | "group" | "rank" | "streak" | "member_warning" | "member_removed" | "challenge_start" | "challenge_end" | "challenge_dday" | "daily_reminder";
+export type NotifType = "goal" | "badge" | "group" | "rank" | "streak" | "member_warning" | "member_removed" | "challenge_start" | "challenge_end" | "challenge_dday" | "daily_reminder" | "challenge_reopened";
 
 export interface AppNotification {
   id: string;
@@ -166,8 +166,7 @@ interface AppContextType {
   setTheme: (t: "light" | "dark" | "system") => void;
   nickname: string;
   setNickname: (n: string) => void;
-  recoveryTickets: number;
-  useRecoveryTicket: () => boolean;
+  participationTickets: number;
   // Verification
   verifyType: VerifyTypeKey | null;
   setVerifyType: (t: VerifyTypeKey | null) => void;
@@ -194,6 +193,9 @@ interface AppContextType {
   // 종료 확인
   confirmedEndedIds: Set<string>;
   confirmEndedGroup: (id: string) => void;
+  // 재개설 알림 신청 — group_id (uuid/dbId) 기준
+  reopenNotifyIds: Set<string>;
+  toggleReopenNotify: (dbId: string) => void;
   // Notifications
   notifications: AppNotification[];
   notificationsLoading: boolean;
@@ -235,7 +237,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   const [nickname, setNickname] = useState("이름");
-  const [recoveryTickets, setRecoveryTickets] = useState(2);
+  const [participationTickets, setParticipationTickets] = useState(5);
   const [verifyType, setVerifyType] = useState<VerifyTypeKey | null>(null);
   const [verificationGroupId, setVerificationGroupId] = useState<string | null>(null);
   const [verificationImageUrl, setVerificationImageUrl] = useState<string | null>(null);
@@ -247,6 +249,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [groupsLoadError, setGroupsLoadError] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [confirmedEndedIds, setConfirmedEndedIds] = useState<Set<string>>(loadConfirmedEnded);
+  const [reopenNotifyIds, setReopenNotifyIds] = useState<Set<string>>(() => new Set());
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [latestNotification, setLatestNotification] = useState<AppNotification | null>(null);
@@ -272,12 +275,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (user && profile) {
       setNickname(profile.username ?? "이름");
-      setRecoveryTickets(profile.recovery_tickets);
+      setParticipationTickets(profile.participation_tickets);
       return;
     }
     if (!user) {
       setNickname("이름");
-      setRecoveryTickets(2);
+      setParticipationTickets(5);
     }
   }, [user, profile]);
 
@@ -316,6 +319,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // 재개설 알림 신청 목록 로드
+  useEffect(() => {
+    if (!user) { setReopenNotifyIds(new Set()); return; }
+    let cancelled = false;
+    void supabase
+      .from("challenge_reopen_subscriptions")
+      .select("group_id")
+      .eq("user_id", user.id)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { console.error("Failed to load reopen subscriptions", error); return; }
+        setReopenNotifyIds(new Set((data ?? []).map(r => r.group_id)));
+      });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
   // 새 알림 Realtime 구독
   useEffect(() => {
     if (!user) return;
@@ -333,25 +352,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .subscribe();
     return () => { supabase.removeChannel(channel).catch(err => console.error("removeChannel failed:", err)); };
   }, [user?.id]);
-
-  function useRecoveryTicket() {
-    if (recoveryTickets <= 0) return false;
-    setRecoveryTickets(current => {
-      const nextValue = current - 1;
-      if (user && nextValue >= 0) {
-        void supabase
-          .from("profiles")
-          .update({ recovery_tickets: nextValue })
-          .eq("id", user.id)
-          .then(({ error }) => {
-            if (error) console.error("Failed to update recovery tickets", error);
-            void refreshProfile();
-          });
-      }
-      return nextValue;
-    });
-    return true;
-  }
 
   function beginVerification({ verifyType = null, groupId = null }: { verifyType?: VerifyTypeKey | null; groupId?: string | null }) {
     setVerifyType(verifyType);
@@ -535,7 +535,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // LEFT/REMOVED는 영구 — 어떤 상황에서도 현재 챌린지 재참여 불가
     if (target?.isRemoved || target?.isLeft) return;
     if (pendingGroupOps.current.has(appId)) return;
+    // 참가권 0장이면 합류 차단 (UI에서도 막지만 방어적으로 한 번 더)
+    if (participationTickets <= 0) return;
 
+    if (!user || !dbId) return;
+
+    // 참가권 1장 차감 (낙관적)
+    const prevTickets = participationTickets;
+    const nextTickets = prevTickets - 1;
     setGroups(prev => {
       if (prev.some(g => (g.id === appId || g.dbId === id) && g.joined)) return prev;
       return prev.map(g => (g.id === appId || g.dbId === id)
@@ -543,21 +550,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
         : g
       );
     });
-
-    if (!user || !dbId) return;
+    setParticipationTickets(nextTickets);
 
     pendingGroupOps.current.add(appId);
     void supabase
-      .from("group_members")
-      .insert({ group_id: dbId, user_id: user.id })
-      .then(({ error }) => {
+      .rpc("join_group_with_ticket", { p_group_id: dbId })
+      .then(({ data, error }) => {
         pendingGroupOps.current.delete(appId);
-        if (!error) { void refreshGroups(); return; }
+        if (!error) {
+          const row = data?.[0];
+          if (row?.participation_tickets !== undefined) {
+            setParticipationTickets(row.participation_tickets);
+          }
+          void refreshProfile();
+          void refreshGroups();
+          return;
+        }
         console.error("Failed to join group", error);
+        // 그룹/참가권 모두 롤백
         setGroups(prev => prev.map(g => g.id === appId
           ? { ...g, joined: false, members: Math.max(0, g.members - 1) }
           : g
         ));
+        setParticipationTickets(prevTickets);
       });
   }
 
@@ -575,6 +590,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const dbId = target?.dbId;
 
     if (pendingGroupOps.current.has(appId)) return;
+    if (!user || !dbId) return;
 
     // 낙관적 업데이트: joined → false, isLeft → true
     setGroups(prev => {
@@ -586,17 +602,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       );
     });
 
-    if (!user || !dbId) return;
-
     pendingGroupOps.current.add(appId);
     void supabase
-      .from("group_members")
-      .update({ member_status: "LEFT" })
-      .eq("group_id", dbId)
-      .eq("user_id", user.id)
-      .then(({ error }) => {
+      .rpc("leave_group", { p_group_id: dbId })
+      .then(({ data, error }) => {
         pendingGroupOps.current.delete(appId);
-        if (!error) {
+        if (!error && data) {
           void refreshGroups();
           return;
         }
@@ -620,17 +631,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  /* ── 재개설 알림 신청 토글 (DB 동기화 + optimistic) ── */
+  function toggleReopenNotify(dbId: string) {
+    if (!user) return;
+    const wasOn = reopenNotifyIds.has(dbId);
+
+    // optimistic
+    setReopenNotifyIds(prev => {
+      const next = new Set(prev);
+      if (wasOn) next.delete(dbId);
+      else       next.add(dbId);
+      return next;
+    });
+
+    const op = wasOn
+      ? supabase.from("challenge_reopen_subscriptions")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("group_id", dbId)
+      : supabase.from("challenge_reopen_subscriptions")
+          .insert({ user_id: user.id, group_id: dbId });
+
+    void op.then(({ error }) => {
+      if (!error) return;
+      console.error("Failed to toggle reopen subscription", error);
+      // 롤백
+      setReopenNotifyIds(prev => {
+        const next = new Set(prev);
+        if (wasOn) next.add(dbId);
+        else       next.delete(dbId);
+        return next;
+      });
+    });
+  }
+
   return (
     <AppContext.Provider value={{
       theme, setTheme,
       nickname, setNickname,
-      recoveryTickets, useRecoveryTicket,
+      participationTickets,
       verifyType, setVerifyType,
       verificationGroupId, verificationImageUrl, verificationImageFile, verificationHistory, verificationLoading,
       beginVerification, setVerificationImage, completeCurrentVerification, clearVerification, refreshVerifications,
       groups, groupsLoading, groupsLoadError, refreshGroups,
       joinGroup, leaveGroup, markGroupLeft, selectedGroupId, setSelectedGroupId,
       confirmedEndedIds, confirmEndedGroup,
+      reopenNotifyIds, toggleReopenNotify,
       notifications, notificationsLoading, latestNotification,
       markNotifRead, markAllNotifsRead, handleNotifAction, reloadNotifications,
     }}>

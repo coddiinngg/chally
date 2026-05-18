@@ -69,10 +69,10 @@ export function EditProfile() {
     setSaving(true);
     try {
       const nextAvatarUrl = await uploadAvatar();
-      const { error } = await supabase
-        .from("profiles")
-        .update({ username: username.trim() || null, avatar_url: nextAvatarUrl })
-        .eq("id", user.id);
+      const { error } = await supabase.rpc("update_profile_basic", {
+        p_username: username.trim() || null,
+        p_avatar_url: nextAvatarUrl,
+      });
       if (error) throw error;
       await refreshProfile();
       setNickname(username.trim() || "이름");
