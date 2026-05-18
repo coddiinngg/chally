@@ -964,9 +964,16 @@ export function GroupDetailUI() {
 
         /* 참여중 + 모집중 → 아직 시작 전 */
         ) : group.joined && phase === "recruit" ? (
-          <div className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-blue-50 border border-blue-100">
-            <span className="text-[15px]">⏳</span>
-            <span className="text-[15px] font-black text-blue-400">챌린지 시작을 기다리는 중이에요</span>
+          <div className="w-full h-16 flex items-center justify-center gap-2.5 rounded-2xl bg-blue-50 border border-blue-100">
+            <span className="text-[18px]">⏳</span>
+            <div className="flex flex-col items-start gap-1">
+              <span className="text-[16px] font-black text-blue-400 leading-none">챌린지 시작을 기다리는 중이에요</span>
+              {group.challengeStart && (
+                <span className="text-[13px] font-bold text-blue-300 leading-none">
+                  오픈까지 D-{Math.max(0, Math.ceil((new Date(group.challengeStart).getTime() - Date.now()) / 86_400_000))}
+                </span>
+              )}
+            </div>
           </div>
 
         /* 참여중 → 인증하기 */

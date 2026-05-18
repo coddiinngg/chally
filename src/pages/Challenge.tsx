@@ -372,6 +372,9 @@ export function Challenge() {
 
             const canNotifyReopen = canRequestReopenNotify(phase, g.challengeEnd) && !!g.dbId;
             const notifyOn = !!g.dbId && reopenNotifyIds.has(g.dbId);
+            const daysUntilOpen = phase === "recruit" && g.challengeStart
+              ? Math.max(0, Math.ceil((new Date(g.challengeStart).getTime() - Date.now()) / 86_400_000))
+              : null;
 
             return (
               <div
@@ -504,6 +507,13 @@ export function Challenge() {
                   )}
 
                   {/* 재개설 알림 신청 (마감임박 + 종료 후 5일 이내) */}
+                  {/* 모집중 → 오픈 D-N */}
+                  {daysUntilOpen !== null && (
+                    <p className="text-center text-[11px] font-bold text-blue-400 mt-1.5">
+                      오픈까지 D-{daysUntilOpen}
+                    </p>
+                  )}
+
                   {canNotifyReopen && g.dbId && (
                     <button
                       onClick={(e) => {

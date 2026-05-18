@@ -1286,8 +1286,10 @@ export function Home() {
               </div>
               <div className="flex flex-col gap-0.5 flex-1">
                 <span className="text-white font-black text-[16px] leading-none tracking-tight">챌린지 시작을 기다리는 중이에요</span>
-                <span className="text-white/55 text-[12px] font-medium leading-none truncate">
-                  {selectedGroup?.title} · 모집중
+                <span className="text-white/70 text-[14px] font-bold leading-none">
+                  {selectedGroup?.challengeStart
+                    ? `오픈까지 D-${Math.max(0, Math.ceil((new Date(selectedGroup.challengeStart).getTime() - Date.now()) / 86_400_000))}`
+                    : "모집중"}
                 </span>
               </div>
             </div>
