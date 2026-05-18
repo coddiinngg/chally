@@ -52,7 +52,6 @@ export function Profile() {
   const [signOutError, setSignOutError] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteRequested, setDeleteRequested] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   useScrollRestoration("pf-scroll", scrollRef, !groupsLoading);
@@ -86,15 +85,19 @@ export function Profile() {
     if (deleteLoading) return;
     setDeleteLoading(true);
     setDeleteError("");
-    const { error } = await supabase.rpc("request_account_deletion");
-    setDeleteLoading(false);
+    const { error } = await supabase.functions.invoke("delete-account", { method: "POST" });
     if (error) {
-      setDeleteError(error.message);
+      setDeleteLoading(false);
+      setDeleteError(error.message ?? "계정 삭제 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.");
       return;
     }
-    setShowDeleteConfirm(false);
-    setDeleteRequested(true);
-    setTimeout(() => setDeleteRequested(false), 3500);
+    // 삭제 성공 → 로그아웃 후 로그인 화면으로
+    try {
+      await signOut();
+    } catch {
+      // signOut 실패해도 계정 자체는 이미 삭제됨. 다음 자동 토큰 갱신에서 invalid해질 것.
+    }
+    navigate("/login", { replace: true });
   }
 
   return (
@@ -103,12 +106,6 @@ export function Profile() {
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl text-white text-[13px] font-semibold pointer-events-none whitespace-nowrap"
           style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}>
           로그아웃에 실패했어요. 다시 시도해주세요.
-        </div>
-      )}
-      {deleteRequested && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl text-white text-[13px] font-semibold pointer-events-none whitespace-nowrap"
-          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}>
-          계정 삭제 요청이 접수됐어요.
         </div>
       )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
@@ -328,7 +325,7 @@ export function Profile() {
               <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-rose-50 dark:bg-rose-950/30">
                 <Trash2 className="w-4 h-4 text-rose-500" />
               </div>
-              <span className="flex-1 text-left text-[14px] font-semibold text-rose-500">계정 삭제 요청</span>
+              <span className="flex-1 text-left text-[14px] font-semibold text-rose-500">계정 삭제</span>
             </button>
             <div className="h-px bg-slate-100 dark:bg-white/[0.06] mx-4" />
             <button
@@ -372,9 +369,9 @@ export function Profile() {
                 <AlertTriangle className="w-5 h-5 text-rose-500" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-[18px] font-black text-slate-900 dark:text-white">계정 삭제를 요청할까요?</h3>
+                <h3 className="text-[18px] font-black text-slate-900 dark:text-white">정말 계정을 삭제할까요?</h3>
                 <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                  요청이 접수되면 운영자가 계정과 관련 데이터를 확인 후 삭제 처리합니다. 처리 전까지는 같은 계정으로 계속 로그인할 수 있어요.
+                  삭제하면 프로필, 인증 기록, 사진, 활동 내역이 즉시 모두 사라져요. 한 번 삭제하면 복구할 수 없어요.
                 </p>
               </div>
             </div>
@@ -396,7 +393,7 @@ export function Profile() {
                 disabled={deleteLoading}
                 className="flex-[1.5] py-3.5 rounded-2xl bg-rose-500 text-white text-[14px] font-bold disabled:opacity-60"
               >
-                {deleteLoading ? "요청 중..." : "삭제 요청"}
+                {deleteLoading ? "삭제 중..." : "삭제하기"}
               </button>
             </div>
           </div>

@@ -161,6 +161,32 @@ function loadConfirmedEnded(): Set<string> {
   }
 }
 
+/* ── 강퇴 배너 노출 이력 localStorage 헬퍼 (계정별) ── */
+function seenRemovedKey(userId: string) {
+  return `chally-seen-removed-v1-${userId}`;
+}
+
+function loadSeenRemoved(userId: string): Set<string> {
+  try {
+    return new Set<string>(JSON.parse(localStorage.getItem(seenRemovedKey(userId)) ?? "[]") as string[]);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function saveSeenRemoved(userId: string, ids: Set<string>) {
+  try {
+    localStorage.setItem(seenRemovedKey(userId), JSON.stringify([...ids]));
+  } catch {
+    // ignore quota errors
+  }
+}
+
+export interface RemovedBannerItem {
+  dbId: string;
+  groupName: string;
+}
+
 interface AppContextType {
   theme: "light" | "dark" | "system";
   setTheme: (t: "light" | "dark" | "system") => void;
@@ -204,6 +230,9 @@ interface AppContextType {
   markAllNotifsRead: () => Promise<void>;
   handleNotifAction: (id: string, accepted?: boolean) => Promise<void>;
   reloadNotifications: () => Promise<void>;
+  // 강퇴 배너 (앱 진입 시 1회 노출)
+  recentRemovals: RemovedBannerItem[];
+  dismissRemoval: (dbId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -250,6 +279,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [confirmedEndedIds, setConfirmedEndedIds] = useState<Set<string>>(loadConfirmedEnded);
   const [reopenNotifyIds, setReopenNotifyIds] = useState<Set<string>>(() => new Set());
+  const [recentRemovals, setRecentRemovals] = useState<RemovedBannerItem[]>([]);
+  const seenRemovedRef = useRef<Set<string>>(new Set());
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [latestNotification, setLatestNotification] = useState<AppNotification | null>(null);
@@ -514,6 +545,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
           joinedDbIds.add(item.group_id);
         }
       });
+
+      // 새 강퇴 감지 → 상단 배너 큐에 추가
+      const seen = seenRemovedRef.current;
+      const newRemovals: RemovedBannerItem[] = [];
+      removedDbIds.forEach(dbId => {
+        if (seen.has(dbId)) return;
+        const row = dbGroups.find(g => g.id === dbId);
+        if (!row) return;
+        newRemovals.push({ dbId, groupName: row.name });
+      });
+      if (newRemovals.length) {
+        setRecentRemovals(prev => {
+          const existing = new Set(prev.map(r => r.dbId));
+          return [...prev, ...newRemovals.filter(r => !existing.has(r.dbId))];
+        });
+      }
     }
 
     setGroupsLoadError(false);
@@ -525,6 +572,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshGroups();
   }, [refreshGroups]);
+
+  // 유저 변경 시 강퇴 배너 이력 로드/리셋
+  useEffect(() => {
+    if (!user) {
+      seenRemovedRef.current = new Set();
+      setRecentRemovals([]);
+      return;
+    }
+    seenRemovedRef.current = loadSeenRemoved(user.id);
+    setRecentRemovals([]);
+  }, [user?.id]);
+
+  const dismissRemoval = useCallback((dbId: string) => {
+    setRecentRemovals(prev => prev.filter(r => r.dbId !== dbId));
+    if (!user) return;
+    seenRemovedRef.current.add(dbId);
+    saveSeenRemoved(user.id, seenRemovedRef.current);
+  }, [user?.id]);
 
   /* ── 그룹 가입 ── */
   function joinGroup(id: string) {
@@ -679,6 +744,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       reopenNotifyIds, toggleReopenNotify,
       notifications, notificationsLoading, latestNotification,
       markNotifRead, markAllNotifsRead, handleNotifAction, reloadNotifications,
+      recentRemovals, dismissRemoval,
     }}>
       {children}
     </AppContext.Provider>

@@ -226,7 +226,7 @@ export function Challenge() {
           <span className="text-[18px] leading-none shrink-0">🚪</span>
           <div>
             <p className="text-white font-black text-[13px] leading-tight">그룹에서 퇴장됐어요</p>
-            <p className="text-white/75 text-[11px] mt-0.5">48시간 미인증으로 인해 자동 퇴장 처리됐어요.</p>
+            <p className="text-white/75 text-[11px] mt-0.5">72시간 미인증으로 인해 자동 퇴장 처리됐어요.</p>
           </div>
         </div>
       )}

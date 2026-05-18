@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { BottomNav } from "./BottomNav";
+import { RemovedBanner } from "./RemovedBanner";
 
 const TAB_PATHS = ["/", "/challenge", "/stats", "/profile"];
 
@@ -39,6 +40,7 @@ export function Layout({ showNav = true }: { showNav?: boolean }) {
       onTouchEnd={handleTouchEnd}
     >
       <Outlet />
+      <RemovedBanner />
       {showNav && <BottomNav />}
     </div>
   );

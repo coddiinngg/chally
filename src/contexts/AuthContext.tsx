@@ -3,6 +3,7 @@ import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import type { Profile } from '../types/database';
 import { setGuestMode } from '../App';
+import { setSentryUser } from '../lib/sentry';
 
 interface AuthContextType {
   user: User | null;
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      setSentryUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
       if (session?.user) void fetchProfile(session.user.id);
       else setProfile(null);
       setLoading(false);
@@ -38,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      setSentryUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
       if (session?.user) void fetchProfile(session.user.id);
       else setProfile(null);
     });

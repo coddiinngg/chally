@@ -245,7 +245,7 @@ ended   : now > challengeEnd
 자동 퇴장 흐름은 `update_member_statuses()`가 담당한다:
 
 ```
-ACTIVE -> 48h 미인증 -> EXIT_ELIGIBLE -> 6h 경과 -> REMOVED
+ACTIVE -> 48h 미인증 -> EXIT_ELIGIBLE -> 24h 경과 -> REMOVED
 ```
 
 ### 참가권
@@ -316,10 +316,11 @@ ACTIVE -> 48h 미인증 -> EXIT_ELIGIBLE -> 6h 경과 -> REMOVED
 
 ### RLS 요약
 
-- `profiles`: 본인 SELECT/INSERT/UPDATE. 공개 프로필은 `get_public_profile` RPC로 조회
-- `groups`: 공개 그룹 SELECT, 생성자만 INSERT/UPDATE/DELETE
-- `group_members`: 본인 행 SELECT/INSERT/UPDATE/DELETE
-- `verifications`: 본인 CRUD
+- `profiles`: 본인 SELECT만. INSERT는 `handle_new_user` 트리거, UPDATE는 `update_profile_basic` RPC 경유. 공개 프로필은 `get_public_profile` RPC로 조회
+- `groups`: 공개 그룹 SELECT만. INSERT/UPDATE/DELETE 정책 없음 — 어드민/마이그레이션만 변경
+- `group_members`: 본인 행 SELECT만. INSERT/UPDATE/DELETE는 `join_group_with_ticket`/`leave_group`/`claim_participation_benefit` RPC 또는 Edge Function(service_role) 경유
+- `verifications`: 본인 SELECT만. INSERT는 `verify-photo` Edge Function(service_role) 경유, UPDATE/DELETE 정책 없음
+- `account_deletion_requests`: 본인 SELECT만. INSERT는 `request_account_deletion` RPC 경유
 - `activity_posts`, `activity_reactions`: 활동 조회는 공개, 변경은 본인/멤버 기준
 - `group_messages`, `group_message_reactions`: 같은 그룹 멤버만 메시지 조회/작성, 리액션 변경은 본인만
 - `notifications`: 본인 SELECT/UPDATE. INSERT policy 없음, service role만 가능
@@ -400,6 +401,9 @@ service role/cron 성격:
 | `20260514100000` | `drop_legacy_columns_and_fix_member_count` | 레거시 컬럼 제거, member_count 보정 |
 | `20260514110000` | `filter_leaderboard_and_profile` | 리더보드/공개 프로필 필터 강화 |
 | `20260516000000` | `participation_tickets` | 복구권 -> 참가권, benefit_claimed_at |
+| `20260518000000` | `kick_timer_extend_to_72h` | 강퇴 유예 6h -> 24h (총 72h) |
+| `20260518100000` | `release_rpcs_and_deletion_requests` | 5개 출시 RPC + `account_deletion_requests` 테이블 |
+| `20260518110000` | `drop_direct_write_policies` | profiles/verifications/groups/group_members 직접 write 정책 11개 제거. 모든 client write는 RPC 경유 |
 
 ## 작업 시 주의사항
 

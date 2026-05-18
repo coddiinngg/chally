@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
       // GEMINI_API_KEY는 클라이언트 번들에 포함하지 않습니다 (Edge Function에서만 사용)
       'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
       'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY),
+      'process.env.SENTRY_DSN': JSON.stringify(env.SENTRY_DSN ?? ''),
     },
     resolve: {
       alias: {

@@ -1349,7 +1349,7 @@ export function Home() {
                 </span>
                 <span className="text-white/85 text-[12px] font-medium leading-none truncate">
                   {isExitEligible
-                    ? "48시간 안에 인증하지 않으면 퇴장돼요"
+                    ? "24시간 안에 인증하지 않으면 퇴장돼요"
                     : selectedGroup
                       ? `${VERIFY_TYPES[(selectedGroup.verifyType as VerifyTypeKey) ?? "step_walk"]?.emoji} ${selectedGroup.goal}`
                       : "챌린지에 참여하고 인증해보세요"}

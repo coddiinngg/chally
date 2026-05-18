@@ -11,7 +11,7 @@ const CORS_HEADERS = {
 };
 
 // 사용자당 하루 최대 AI 호출 횟수
-const MAX_DAILY_USER_CALLS = 20;
+const MAX_DAILY_USER_CALLS = 30;
 // 요청 본문 최대 크기: 8MB (base64 기준 ~6MB 이미지)
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
 

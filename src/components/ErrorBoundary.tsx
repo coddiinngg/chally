@@ -1,4 +1,5 @@
 import React from "react";
+import { captureException } from "../lib/sentry";
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -13,8 +14,9 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren<objec
     return { hasError: true };
   }
 
-  componentDidCatch(error: unknown) {
+  componentDidCatch(error: unknown, info: React.ErrorInfo) {
     console.error("Unhandled app error:", error);
+    captureException(error, { componentStack: info.componentStack });
   }
 
   render() {
