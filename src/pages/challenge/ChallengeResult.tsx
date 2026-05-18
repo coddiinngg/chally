@@ -498,7 +498,7 @@ export function ChallengeResult() {
                             transform: podiumIdx === 0 ? "translateY(-6px)" : "none",
                           }}>
                           <Crown className="w-4 h-4 mb-1" style={{ color }} />
-                          <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 mb-1">
+                          <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-200 mb-1">
                             {p.avatarUrl
                               ? <img src={p.avatarUrl} alt="" className="w-full h-full object-cover" />
                               : <div className="w-full h-full flex items-center justify-center text-slate-600 text-[13px] font-bold">{p.name.charAt(0)}</div>
@@ -526,7 +526,7 @@ export function ChallengeResult() {
                           background: p.isMe ? "rgba(255,51,85,0.12)" : "transparent",
                         }}>
                         <span className="text-slate-400 text-[12px] font-bold tabular-nums w-6 text-center">{p.rank}</span>
-                        <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-200">
+                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-200">
                           {p.avatarUrl
                             ? <img src={p.avatarUrl} alt="" className="w-full h-full object-cover" />
                             : <div className="w-full h-full flex items-center justify-center text-slate-600 text-[11px] font-bold">{p.name.charAt(0)}</div>

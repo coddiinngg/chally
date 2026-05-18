@@ -39,7 +39,7 @@ function FeedGridCard({ item, onClick }: { item: ActivityFeedItem; onClick: () =
         <img
           src={item.author_avatar_url ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.user_id}`}
           alt={item.author_name ?? ""}
-          className="w-4 h-4 rounded-full bg-white/20 object-cover mb-0.5"
+          className="w-4 h-4 rounded-md bg-white/20 object-cover mb-0.5"
         />
         <p className="text-white text-[9px] font-black truncate leading-none">{item.author_name ?? "챌리 유저"}</p>
       </div>
@@ -140,7 +140,7 @@ function FeedViewerOverlay({
                   <img
                     src={item.author_avatar_url ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.user_id}`}
                     alt={item.author_name ?? ""}
-                    className="w-9 h-9 rounded-full bg-slate-100 dark:bg-white/10 object-cover shrink-0 border border-black/10 dark:border-white/15"
+                    className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-white/10 object-cover shrink-0 border border-black/10 dark:border-white/15"
                     draggable={false}
                   />
                   <div className="text-left">
@@ -268,7 +268,7 @@ export function FeedAll() {
               style={{ background: "linear-gradient(135deg,#FF3355,#CC0030)" }}>
               <Zap className="w-3.5 h-3.5 text-white fill-white" />
             </div>
-            <h1 className="text-[18px] font-black text-slate-900 dark:text-white">실시간 인증 피드</h1>
+            <h1 className="text-[20px] font-black text-slate-900 dark:text-white tracking-tight">실시간 인증 피드</h1>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           </div>
         </div>

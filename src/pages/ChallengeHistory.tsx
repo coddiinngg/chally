@@ -59,7 +59,7 @@ export function ChallengeHistory() {
           <ChevronLeft className="w-5 h-5 text-slate-700" />
         </button>
         <div>
-          <h1 className="text-[18px] font-black text-slate-900">참여했던 챌린지</h1>
+          <h1 className="text-[20px] font-black text-slate-900 tracking-tight">참여했던 챌린지</h1>
           <p className="text-[11px] text-slate-400 mt-0.5">총 {participated.length}개</p>
         </div>
       </header>

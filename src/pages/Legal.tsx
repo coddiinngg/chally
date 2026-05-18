@@ -19,7 +19,7 @@ function LegalDocument({ title, content }: { title: string; content: string }) {
         </button>
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#FF3355]">Chally</p>
-          <h1 className="text-[19px] font-black text-slate-900 dark:text-white">{title}</h1>
+          <h1 className="text-[20px] font-black text-slate-900 dark:text-white tracking-tight">{title}</h1>
         </div>
       </header>
 
@@ -85,7 +85,7 @@ export function AccountDeletionPage() {
         </button>
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#FF3355]">Chally</p>
-          <h1 className="text-[19px] font-black text-slate-900 dark:text-white">계정 삭제 안내</h1>
+          <h1 className="text-[20px] font-black text-slate-900 dark:text-white tracking-tight">계정 삭제 안내</h1>
         </div>
       </header>
 

@@ -560,6 +560,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const existing = new Set(prev.map(r => r.dbId));
           return [...prev, ...newRemovals.filter(r => !existing.has(r.dbId))];
         });
+        // 배너를 한 번이라도 띄운 시점에 곧바로 seen으로 기록 → 다음 앱 진입에는 안 뜸
+        if (user) {
+          newRemovals.forEach(r => seenRemovedRef.current.add(r.dbId));
+          saveSeenRemoved(user.id, seenRemovedRef.current);
+        }
       }
     }
 

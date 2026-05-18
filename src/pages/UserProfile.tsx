@@ -101,7 +101,7 @@ export function UserProfile() {
               }}
             >
               <div
-                className="w-20 h-20 rounded-full bg-white/30 flex items-center justify-center overflow-hidden"
+                className="w-20 h-20 rounded-2xl bg-white/30 flex items-center justify-center overflow-hidden"
                 style={{
                   boxShadow: "0 0 0 3px rgba(255,255,255,0.7), 0 0 0 5px rgba(255,51,85,0.4)",
                   ...(avatarUrl ? { backgroundImage: `url("${avatarUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : {}),

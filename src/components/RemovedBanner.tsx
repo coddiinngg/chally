@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { X } from "lucide-react";
 import { useApp } from "../contexts/AppContext";
 
 const AUTO_DISMISS_MS = 5000;
@@ -40,6 +41,13 @@ export function RemovedBanner() {
           </p>
           <p className="text-white/80 text-[11px] mt-0.5">72시간 미인증으로 자동 퇴장</p>
         </div>
+        <button
+          onClick={() => dismissRemoval(current.dbId)}
+          aria-label="닫기"
+          className="shrink-0 -mr-1 -mt-0.5 w-7 h-7 rounded-full flex items-center justify-center active:bg-white/15 transition-colors"
+        >
+          <X className="w-4 h-4 text-white/90" strokeWidth={2.5} />
+        </button>
       </div>
     </div>
   );

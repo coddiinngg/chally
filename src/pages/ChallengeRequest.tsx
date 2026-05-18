@@ -1066,7 +1066,7 @@ export function ChallengeRequest() {
         >
           <ArrowLeft className="w-5 h-5 text-slate-600" />
         </button>
-        <h1 className="text-[17px] font-bold text-slate-900">{titles[view]}</h1>
+        <h1 className="text-[20px] font-black text-slate-900 tracking-tight">{titles[view]}</h1>
         <div className="w-9 h-9 flex items-center justify-center">
           {view === "detail" && (
             <button

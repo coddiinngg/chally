@@ -138,11 +138,11 @@ export function Profile() {
               }}
             >
               <div
-                className="absolute -inset-1 rounded-full"
-                style={{ background: "conic-gradient(from 0deg, rgba(255,255,255,0.8), rgba(255,255,255,0.3), rgba(255,255,255,0.8))", borderRadius: "50%" }}
+                className="absolute -inset-1 rounded-[24px]"
+                style={{ background: "conic-gradient(from 0deg, rgba(255,255,255,0.8), rgba(255,255,255,0.3), rgba(255,255,255,0.8))" }}
               />
               <div
-                className="relative w-20 h-20 rounded-full bg-white/20 flex items-center justify-center overflow-hidden"
+                className="relative w-20 h-20 rounded-2xl bg-white/20 flex items-center justify-center overflow-hidden"
                 style={{
                   boxShadow: "0 0 0 2px rgba(255,255,255,0.9), 0 0 0 4px rgba(255,51,85,0.5)",
                   ...(avatarUrl ? { backgroundImage: `url("${avatarUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : {}),

@@ -170,7 +170,7 @@ export function WeeklyReport() {
         </button>
         <div className="flex-1 ml-3">
           <p className="text-[10px] font-bold uppercase tracking-widest text-[#FF3355]">통계</p>
-          <h1 className="text-[20px] font-black text-slate-900">주간 리포트</h1>
+          <h1 className="text-[20px] font-black text-slate-900 tracking-tight">주간 리포트</h1>
         </div>
         <div className="flex items-center gap-1">
           <button

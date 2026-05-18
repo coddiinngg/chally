@@ -226,7 +226,7 @@ export function FriendInvite() {
         </button>
         <div className="flex-1">
           <p className="text-[10px] font-bold uppercase tracking-widest text-[#FF3355]">소셜</p>
-          <h1 className="text-[20px] font-black text-slate-900">친구 초대</h1>
+          <h1 className="text-[20px] font-black text-slate-900 tracking-tight">친구 초대</h1>
         </div>
         {invitedCount > 0 && (
           <span

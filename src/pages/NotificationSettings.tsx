@@ -121,7 +121,7 @@ export function NotificationSettings() {
         >
           <ChevronLeft className="w-5 h-5 text-slate-700" />
         </button>
-        <h1 className="text-[17px] font-black text-slate-900 ml-3">알림 설정</h1>
+        <h1 className="text-[20px] font-black text-slate-900 tracking-tight ml-3">알림 설정</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5">

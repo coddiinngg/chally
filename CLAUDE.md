@@ -404,6 +404,7 @@ service role/cron 성격:
 | `20260518000000` | `kick_timer_extend_to_72h` | 강퇴 유예 6h -> 24h (총 72h) |
 | `20260518100000` | `release_rpcs_and_deletion_requests` | 5개 출시 RPC + `account_deletion_requests` 테이블 |
 | `20260518110000` | `drop_direct_write_policies` | profiles/verifications/groups/group_members 직접 write 정책 11개 제거. 모든 client write는 RPC 경유 |
+| `20260518120000` | `account_deletion_audit_preserve` | `account_deletion_requests.user_id` FK를 ON DELETE SET NULL으로 변경. 유저 삭제 후에도 감사 로그 row 보존 |
 
 ## 작업 시 주의사항
 

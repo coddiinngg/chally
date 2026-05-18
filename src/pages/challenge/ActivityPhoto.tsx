@@ -139,7 +139,7 @@ export function ActivityPhoto() {
             <img
               src={avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`}
               alt={name}
-              className="w-10 h-10 rounded-full border-2 border-white/40 bg-white/10 shrink-0"
+              className="w-10 h-10 rounded-xl border-2 border-white/40 bg-white/10 shrink-0"
               draggable={false}
             />
             <div className="text-left">

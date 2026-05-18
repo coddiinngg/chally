@@ -67,7 +67,7 @@ export function Rewards() {
         </button>
         <div className="flex-1">
           <p className="text-[11px] font-bold text-[#FF3355] uppercase tracking-widest">My Level</p>
-          <h1 className="text-[20px] font-black text-slate-900 leading-tight">등급</h1>
+          <h1 className="text-[20px] font-black text-slate-900 leading-tight tracking-tight">등급</h1>
         </div>
         <div className="flex items-center gap-1.5 bg-[#FF3355]/10 px-3 py-1.5 rounded-full">
           <Zap className="w-3.5 h-3.5 text-[#FF3355]" />

@@ -80,7 +80,7 @@ export function Notifications() {
           <ChevronLeft className="w-5 h-5 text-slate-700" />
         </button>
         <div className="flex items-center gap-2">
-          <h1 className="text-[17px] font-black text-slate-900">알림</h1>
+          <h1 className="text-[20px] font-black text-slate-900 tracking-tight">알림</h1>
           {unreadCount > 0 && (
             <span className="bg-[#FF3355] text-white text-[11px] font-black px-2 py-0.5 rounded-full min-w-[20px] text-center">
               {unreadCount}

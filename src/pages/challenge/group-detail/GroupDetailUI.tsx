@@ -457,10 +457,10 @@ export function GroupDetailUI() {
               <div className="flex -space-x-2.5 shrink-0">
                 {top3.map((p, i) => (
                   <img key={i} src={p.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.seed}`}
-                    className="w-10 h-10 rounded-full border-2 border-white bg-slate-100 shrink-0 object-cover" />
+                    className="w-10 h-10 rounded-xl border-2 border-white bg-slate-100 shrink-0 object-cover" />
                 ))}
                 {group.members > 3 && (
-                  <div className="w-10 h-10 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-xl border-2 border-white bg-slate-100 flex items-center justify-center shrink-0">
                     <span className="text-[9px] font-black text-slate-500">+{group.members - 3}</span>
                   </div>
                 )}
@@ -671,7 +671,7 @@ export function GroupDetailUI() {
                   <div className="px-4 pt-3.5 pb-3 flex items-center gap-3">
                     <div className="relative shrink-0">
                       <img src={myRank.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${myRank.seed}`}
-                        className="w-12 h-12 rounded-full bg-slate-100 object-cover" />
+                        className="w-12 h-12 rounded-xl bg-slate-100 object-cover" />
                       <span className="absolute -bottom-1 -right-1 text-[9px] font-black text-white bg-[#FF3355] px-1.5 py-0.5 rounded-full leading-none">나</span>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -817,7 +817,7 @@ export function GroupDetailUI() {
                           <span className={cn("w-6 text-center text-[13px] font-black tabular-nums shrink-0",
                             isMe ? "text-[#FF3355]" : "text-slate-300")}>{rank}</span>
                           <img src={avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`}
-                            className="w-9 h-9 rounded-full bg-slate-100 shrink-0 object-cover" />
+                            className="w-9 h-9 rounded-xl bg-slate-100 shrink-0 object-cover" />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                               <p className={cn("text-[13px] font-bold truncate",
@@ -911,7 +911,7 @@ export function GroupDetailUI() {
                       <div className="absolute inset-x-0 bottom-0 h-10 pointer-events-none"
                         style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55), transparent)" }} />
                       <img src={item.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`} alt=""
-                        className="absolute bottom-1.5 left-1.5 w-5 h-5 rounded-full bg-white border border-white/60 object-cover" />
+                        className="absolute bottom-1.5 left-1.5 w-5 h-5 rounded-md bg-white border border-white/60 object-cover" />
                     </button>
                   ))}
                 </div>
@@ -1006,7 +1006,7 @@ export function GroupDetailUI() {
           <div className="flex items-center justify-between px-4 pt-5 pb-3 shrink-0">
             <div className="flex items-center gap-2.5">
               <img src={lightbox.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${lightbox.seed}`} alt=""
-                className="w-9 h-9 rounded-full bg-white/10 border border-white/20 object-cover" />
+                className="w-9 h-9 rounded-xl bg-white/10 border border-white/20 object-cover" />
               <div>
                 <p className="text-white font-black text-[13px] leading-none">{lightbox.name}</p>
                 <p className="text-white/45 text-[11px] mt-0.5">{lightbox.time}</p>

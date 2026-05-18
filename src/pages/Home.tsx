@@ -75,7 +75,8 @@ export function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const { nickname, beginVerification, groups, groupsLoading, groupsLoadError, selectedGroupId, setSelectedGroupId, notifications, latestNotification, confirmedEndedIds, confirmEndedGroup } = useApp();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const avatarUrl = profile?.avatar_url ?? null;
   const myGroups = groups.filter(g => g.joined && !confirmedEndedIds.has(g.id));
 
   // 뒤로가기 복귀 시 채팅 캐시에서 초기화 (빈 화면 방지)
@@ -603,12 +604,13 @@ export function Home() {
         style={{ animation: isReturnVisit ? "none" : "hm-in 0.4s ease both", borderBottom: "1px solid rgba(0,0,0,0.04)" }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#FF3355] flex items-center justify-center text-white font-black text-[16px] shrink-0 shadow-[0_4px_12px_rgba(255,51,85,0.35)]">
-              {nickname.charAt(0)}
+            <div
+              className="w-10 h-10 rounded-xl bg-[#FF3355] flex items-center justify-center text-white font-black text-[16px] shrink-0 shadow-[0_4px_12px_rgba(255,51,85,0.35)] overflow-hidden"
+              style={avatarUrl ? { backgroundImage: `url("${avatarUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+            >
+              {!avatarUrl && nickname.charAt(0)}
             </div>
-            <div>
-              <p className="text-slate-900 font-black text-[17px] leading-none">{nickname} 님</p>
-            </div>
+            <p className="text-slate-900 font-black text-[20px] leading-none tracking-tight">{nickname}</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => navigate("/challenge/request")}
@@ -1029,7 +1031,7 @@ export function Home() {
                             <span className="text-[18px] mb-1.5 leading-none">{MEDAL[rank - 1]}</span>
                             <div className="relative mb-1.5">
                               <img src={avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`} alt={name}
-                                className="rounded-full bg-slate-100 border-2 object-cover"
+                                className="rounded-xl bg-slate-100 border-2 object-cover"
                                 style={{ width: is1st ? 44 : 36, height: is1st ? 44 : 36, borderColor: isMe ? "#FF3355" : "transparent" }}
                                 draggable={false} />
                               {is1st && <Crown className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
@@ -1056,7 +1058,7 @@ export function Home() {
                               <span className="w-5 text-center text-[12px] font-black tabular-nums shrink-0"
                                 style={{ color: isMe ? "#FF3355" : "rgba(160,160,160,0.7)" }}>{rank}</span>
                               <img src={avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`} alt={name}
-                                className="w-7 h-7 rounded-full bg-slate-100 shrink-0 object-cover" draggable={false} />
+                                className="w-7 h-7 rounded-lg bg-slate-100 shrink-0 object-cover" draggable={false} />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1">
                                   <p className={`text-[12px] font-bold truncate ${isMe ? "text-[#FF3355]" : "text-slate-700"}`}>{name}</p>
@@ -1144,7 +1146,7 @@ export function Home() {
                           <div className={`flex gap-2 items-end ${msg.isMe ? "flex-row-reverse" : "flex-row"}`}>
                             {!msg.isMe && (
                               <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.seed}`} alt={msg.sender}
-                                className="w-7 h-7 rounded-full bg-slate-200 shrink-0 mb-5 cursor-pointer active:opacity-70 transition-opacity" draggable={false}
+                                className="w-7 h-7 rounded-lg bg-slate-200 shrink-0 mb-5 cursor-pointer active:opacity-70 transition-opacity" draggable={false}
                                 onClick={() => navigate(`/user/${msg.dbMessage?.user_id ?? msg.seed}`)} />
                             )}
                             <div className={`flex flex-col gap-0.5 max-w-[68%] ${msg.isMe ? "items-end" : "items-start"}`}>
@@ -1452,7 +1454,7 @@ function FeedCard({ item, onTap }: { item: FeedItem; onTap: () => void; key?: Re
         <img
           src={item.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`}
           alt={item.user}
-          className="w-4 h-4 rounded-full bg-white/20 object-cover mb-0.5"
+          className="w-4 h-4 rounded-md bg-white/20 object-cover mb-0.5"
         />
         <p className="text-white text-[9px] font-black truncate leading-none">{item.user}</p>
       </div>
@@ -1558,7 +1560,7 @@ function FeedViewer({
                   <img
                     src={item.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`}
                     alt={item.user}
-                    className="w-9 h-9 rounded-full bg-slate-100 dark:bg-white/10 object-cover shrink-0 border border-black/10 dark:border-white/15"
+                    className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-white/10 object-cover shrink-0 border border-black/10 dark:border-white/15"
                     draggable={false}
                   />
                   <div className="text-left">

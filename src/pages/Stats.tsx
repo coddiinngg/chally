@@ -253,24 +253,21 @@ export function Stats() {
 
       {/* 헤더 */}
       <header
-        className="shrink-0 flex items-center justify-between px-5 pt-3 pb-3 bg-white border-b border-black/[0.05]"
+        className="shrink-0 flex items-center justify-between px-5 pt-3 pb-2 bg-white border-b border-black/[0.05]"
         style={{ animation: "st-fade 0.4s ease both" }}
       >
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#FF3355] mb-0.5">{calMonth}</p>
-          <h1 className="text-2xl font-black text-slate-900">통계</h1>
-        </div>
+        <h1 className="text-[20px] font-black text-slate-900 tracking-tight">통계</h1>
         <button
           type="button"
           onClick={() => calendarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#FFE8EC] active:scale-90 transition-all"
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#FFE8EC] active:scale-95 transition-all"
           aria-label="월간 인증 현황으로 이동"
         >
           <Calendar className="w-4 h-4 text-[#FF3355]" />
         </button>
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pt-3 pb-5 space-y-4">
 
         {/* 주간 차트 */}
         <div className="rounded-3xl p-5 relative overflow-hidden bg-white border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.05)]"

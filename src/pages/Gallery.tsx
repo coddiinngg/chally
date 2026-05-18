@@ -44,21 +44,16 @@ function getPinchDist(t: React.TouchList) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-function PhotoCard({ grad, label, photoUrl, size }: {
-  grad: string[]; label: string; photoUrl: string | null;
+function PhotoCard({ grad, photoUrl, size }: {
+  grad: string[]; photoUrl: string | null;
   size: "xs" | "sm" | "md" | "lg";
 }) {
-  const fs = size === "xs" ? "text-[7px]" : size === "sm" ? "text-[10px]" : size === "md" ? "text-[13px]" : "text-[15px]";
   const ic = size === "xs" ? 10 : size === "sm" ? 16 : size === "md" ? 24 : 32;
 
   if (photoUrl) {
     return (
       <div className="absolute inset-0">
-        <img src={photoUrl} alt={label} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        <div className="absolute bottom-0 left-0 right-0 px-1 pb-1 pt-4"
-          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55), transparent)" }}>
-          <p className={cn("text-white font-bold truncate leading-tight", fs)}>{label}</p>
-        </div>
+        <img src={photoUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
       </div>
     );
   }
@@ -67,12 +62,8 @@ function PhotoCard({ grad, label, photoUrl, size }: {
     <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})` }}>
       <div className="absolute inset-0 opacity-25"
         style={{ backgroundImage: "radial-gradient(circle at 28% 28%, rgba(255,255,255,0.8) 0%, transparent 55%)" }} />
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+      <div className="absolute inset-0 flex items-center justify-center">
         <CheckCircle2 style={{ width: ic, height: ic, color: "rgba(255,255,255,0.7)" }} strokeWidth={1.8} />
-      </div>
-      <div className="absolute bottom-0 left-0 right-0 px-1 pb-1 pt-3"
-        style={{ background: "linear-gradient(to top, rgba(0,0,0,0.5), transparent)" }}>
-        <p className={cn("text-white font-bold truncate leading-tight", fs)}>{label}</p>
       </div>
     </div>
   );
@@ -103,6 +94,7 @@ export function Gallery() {
   const [panX, setPanX]               = useState(0);
   const [panY, setPanY]               = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isSwapping, setIsSwapping]   = useState(false);
   const [shareState, setShareState]   = useState<"idle"|"shared"|"copied">("idle");
 
   // 처음 열 때만 scale 애니메이션 적용 (탐색 시 제외)
@@ -270,14 +262,26 @@ export function Gallery() {
     lightboxJustOpenedRef.current = false;
     setIsAnimating(true);
     setSwipeOffset(-window.innerWidth);
-    setTimeout(() => { setLightbox(l => (l ?? 0) + 1); setSwipeOffset(0); setScale(1); setPanX(0); setPanY(0); setIsAnimating(false); }, 280);
+    setTimeout(() => {
+      setIsSwapping(true);
+      setLightbox(l => (l ?? 0) + 1);
+      setSwipeOffset(0); setScale(1); setPanX(0); setPanY(0);
+      setIsAnimating(false);
+      requestAnimationFrame(() => { requestAnimationFrame(() => setIsSwapping(false)); });
+    }, 280);
   }
   function goPrev() {
     if (lightbox === null || lightbox <= 0) return;
     lightboxJustOpenedRef.current = false;
     setIsAnimating(true);
     setSwipeOffset(window.innerWidth);
-    setTimeout(() => { setLightbox(l => (l ?? 0) - 1); setSwipeOffset(0); setScale(1); setPanX(0); setPanY(0); setIsAnimating(false); }, 280);
+    setTimeout(() => {
+      setIsSwapping(true);
+      setLightbox(l => (l ?? 0) - 1);
+      setSwipeOffset(0); setScale(1); setPanX(0); setPanY(0);
+      setIsAnimating(false);
+      requestAnimationFrame(() => { requestAnimationFrame(() => setIsSwapping(false)); });
+    }, 280);
   }
 
   async function shareCurrentPhoto() {
@@ -367,7 +371,7 @@ export function Gallery() {
       <style>{`
         @keyframes gl-down { from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);} }
         @keyframes gl-cell { from{opacity:0;transform:scale(0.88);}to{opacity:1;transform:scale(1);} }
-        @keyframes gl-lb   { from{opacity:0;transform:scale(0.94);}to{opacity:1;transform:scale(1);} }
+        @keyframes gl-lb   { from{opacity:0;}to{opacity:1;} }
         @keyframes gl-bg   { from{opacity:0;}to{opacity:1;} }
         @keyframes gl-view { from{opacity:0;transform:scale(0.96);}to{opacity:1;transform:scale(1);} }
         @keyframes gl-year-in { from{opacity:0;transform:scale(0.9) translateY(20px);}to{opacity:1;transform:scale(1) translateY(0);} }
@@ -386,7 +390,7 @@ export function Gallery() {
         </button>
 
         <div className="text-center">
-          <h1 className="text-[16px] font-black text-slate-900 dark:text-white transition-all duration-300">
+          <h1 className="text-[20px] font-black text-slate-900 dark:text-white tracking-tight transition-all duration-300">
             {VIEW_LABELS[viewMode]}
           </h1>
           <p className="text-[11px] text-slate-400 dark:text-white/30 mt-0.5">{filtered.length}장</p>
@@ -481,7 +485,7 @@ export function Gallery() {
                           animation: `gl-cell 0.4s cubic-bezier(0.34,1.2,0.64,1) ${(gi * 5 + ii) * 40 + 80}ms both`,
                         }}
                       >
-                        <PhotoCard grad={photo.grad} label={photo.label} photoUrl={photo.photoUrl} size={cardSize} />
+                        <PhotoCard grad={photo.grad} photoUrl={photo.photoUrl} size={cardSize} />
                       </button>
                     );
                   })}
@@ -519,7 +523,7 @@ export function Gallery() {
                           animation: `gl-cell 0.35s cubic-bezier(0.34,1.2,0.64,1) ${(mi * 7 + ii) * 25 + 60}ms both`,
                         }}
                       >
-                        <PhotoCard grad={photo.grad} label={photo.label} photoUrl={photo.photoUrl} size="xs" />
+                        <PhotoCard grad={photo.grad} photoUrl={photo.photoUrl} size="xs" />
                       </button>
                     );
                   })}
@@ -584,106 +588,123 @@ export function Gallery() {
       {/* ── 라이트박스 ── */}
       {item && lightbox !== null && (
         <div
-          className="fixed inset-0 z-50 bg-black"
+          className="fixed inset-0 z-50 bg-white dark:bg-black"
           style={{ animation: "gl-bg 0.2s ease both" }}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
         >
-          {/* 헤더 */}
-          <div
-            className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 pt-4 pb-3 z-20"
-            style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)" }}
-          >
-            <div>
-              <p className="text-white/40 text-[11px] font-bold">
+          {/* 헤더 — 날짜 + 공유 + 닫기 */}
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 pt-4 pb-3 z-20 bg-gradient-to-b from-white/85 dark:from-black/70 to-transparent">
+            <div className="flex items-center gap-2">
+              <p className="text-slate-600 dark:text-white/60 text-[12px] font-bold">
                 {dayLabel(item.year, item.month, item.day)} · {item.month}월 {item.day}일
               </p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <p className="text-white text-[15px] font-bold">{item.label}</p>
-                {(reactionMap.get(item.id) ?? 0) > 0 && (
-                  <div className="flex items-center gap-1 bg-white/15 backdrop-blur-sm rounded-full px-2 py-0.5">
-                    <span className="text-[12px] leading-none">👍</span>
-                    <span className="text-white text-[11px] font-black tabular-nums">{reactionMap.get(item.id)}</span>
-                  </div>
-                )}
-              </div>
+              {(reactionMap.get(item.id) ?? 0) > 0 && (
+                <div className="flex items-center gap-1 bg-slate-200/80 dark:bg-white/15 backdrop-blur-sm rounded-full px-2 py-0.5">
+                  <span className="text-[12px] leading-none">👍</span>
+                  <span className="text-slate-700 dark:text-white text-[11px] font-black tabular-nums">{reactionMap.get(item.id)}</span>
+                </div>
+              )}
             </div>
-            <button
-              onClick={closeLightbox}
-              className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center active:bg-white/25 transition-colors"
-            >
-              <X className="w-5 h-5 text-white" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={shareCurrentPhoto}
+                className="flex items-center gap-1.5 px-3 h-9 rounded-full bg-slate-100 dark:bg-white/15 active:bg-slate-200 dark:active:bg-white/25 transition-colors"
+              >
+                <Share2 className="w-4 h-4 text-slate-700 dark:text-white/85" />
+                <span className="text-slate-700 dark:text-white/85 text-[12px] font-semibold">
+                  {shareState === "copied" ? "복사됨" : shareState === "shared" ? "완료" : "공유"}
+                </span>
+              </button>
+              <button
+                onClick={closeLightbox}
+                className="w-9 h-9 rounded-full bg-slate-100 dark:bg-white/15 flex items-center justify-center active:bg-slate-200 dark:active:bg-white/25 transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-700 dark:text-white" />
+              </button>
+            </div>
           </div>
 
-          {/* 메인 이미지 영역 — bottom-[178px] = 썸네일 68px + 컨트롤 100px + 여백 10px */}
-          <div className="absolute inset-0 top-[72px] bottom-[178px] flex items-center justify-center overflow-hidden">
+          {/* 메인 이미지 영역 — 틀 없이 원본 비율 그대로 */}
+          <div className="absolute inset-0 top-[64px] bottom-[152px] overflow-hidden">
             {/* 이전 이미지 */}
             {lightbox > 0 && (
-              <div className="absolute inset-0 flex items-center justify-center"
+              <div className="absolute inset-0 flex items-center justify-center px-3 opacity-70"
                 style={{
                   transform: `translate3d(calc(-100% + ${swipeOffset}px), 0, 0)`,
-                  transition: swiping ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+                  transition: (swiping || isSwapping) ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
                   willChange: "transform",
                 }}>
-                <div className="w-[88%] aspect-square rounded-3xl overflow-hidden opacity-70">
-                  <PhotoCard grad={filtered[lightbox - 1].grad} label={filtered[lightbox - 1].label} photoUrl={filtered[lightbox - 1].photoUrl} size="lg" />
-                </div>
+                {filtered[lightbox - 1].photoUrl
+                  ? <img src={filtered[lightbox - 1].photoUrl!} alt="" className="block max-w-full max-h-full object-contain" referrerPolicy="no-referrer" />
+                  : <div className="w-[240px] h-[240px] rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${filtered[lightbox - 1].grad[0]}, ${filtered[lightbox - 1].grad[1]})` }}>
+                      <CheckCircle2 className="w-12 h-12 text-white/70" strokeWidth={1.8} />
+                    </div>
+                }
               </div>
             )}
             {/* 현재 이미지 */}
             <div
-              className="absolute inset-0 flex items-center justify-center"
+              className="absolute inset-0 flex items-center justify-center px-3"
               style={{
                 transform: `translate3d(${swipeOffset}px, 0, 0)`,
-                transition: swiping ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+                transition: (swiping || isSwapping) ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
                 willChange: "transform",
               }}
             >
-              <div
-                className="w-[88%] aspect-square rounded-3xl overflow-hidden relative"
-                style={{
-                  transform: `scale(${scale}) translate(${panX / scale}px, ${panY / scale}px)`,
-                  transition: scale === 1 && !swiping ? "transform 0.3s cubic-bezier(0.34,1.2,0.64,1)" : "none",
-                  boxShadow: "0 30px 80px rgba(0,0,0,0.7)",
-                  willChange: "transform",
-                  ...(lightboxJustOpenedRef.current ? { animation: "gl-lb 0.35s cubic-bezier(0.34,1.2,0.64,1) both" } : {}),
-                }}
-              >
-                <PhotoCard grad={item.grad} label={item.label} photoUrl={item.photoUrl} size="lg" />
-                {scale === 1 && (
-                  <div className="absolute top-3 right-3 bg-black/30 backdrop-blur-sm rounded-full px-2 py-1">
-                    <p className="text-white/60 text-[10px] font-semibold">두 손가락으로 확대</p>
+              {item.photoUrl
+                ? <img
+                    src={item.photoUrl}
+                    alt=""
+                    className="block max-w-full max-h-full object-contain"
+                    style={{
+                      transform: `scale(${scale}) translate(${panX / scale}px, ${panY / scale}px)`,
+                      transition: (scale === 1 && !swiping && !isSwapping) ? "transform 0.3s cubic-bezier(0.4,0,0.2,1)" : "none",
+                      willChange: "transform",
+                      ...(lightboxJustOpenedRef.current ? { animation: "gl-lb 0.25s ease both" } : {}),
+                    }}
+                    referrerPolicy="no-referrer"
+                  />
+                : <div
+                    className="w-[260px] h-[260px] rounded-2xl flex items-center justify-center"
+                    style={{
+                      background: `linear-gradient(135deg, ${item.grad[0]}, ${item.grad[1]})`,
+                      transform: `scale(${scale}) translate(${panX / scale}px, ${panY / scale}px)`,
+                      transition: (scale === 1 && !swiping && !isSwapping) ? "transform 0.3s cubic-bezier(0.4,0,0.2,1)" : "none",
+                    }}>
+                    <CheckCircle2 className="w-14 h-14 text-white/70" strokeWidth={1.8} />
                   </div>
-                )}
-                {scale > 1 && (
-                  <div className="absolute top-3 left-3 bg-black/30 backdrop-blur-sm rounded-full px-2 py-1">
-                    <p className="text-white text-[10px] font-bold">{scale.toFixed(1)}×</p>
-                  </div>
-                )}
-              </div>
+              }
+              {scale > 1 && (
+                <div className="absolute top-3 left-4 bg-black/35 backdrop-blur-sm rounded-full px-2 py-1">
+                  <p className="text-white text-[10px] font-bold">{scale.toFixed(1)}×</p>
+                </div>
+              )}
             </div>
             {/* 다음 이미지 */}
             {lightbox < filtered.length - 1 && (
-              <div className="absolute inset-0 flex items-center justify-center"
+              <div className="absolute inset-0 flex items-center justify-center px-3 opacity-70"
                 style={{
                   transform: `translate3d(calc(100% + ${swipeOffset}px), 0, 0)`,
-                  transition: swiping ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+                  transition: (swiping || isSwapping) ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
                   willChange: "transform",
                 }}>
-                <div className="w-[88%] aspect-square rounded-3xl overflow-hidden opacity-70">
-                  <PhotoCard grad={filtered[lightbox + 1].grad} label={filtered[lightbox + 1].label} photoUrl={filtered[lightbox + 1].photoUrl} size="lg" />
-                </div>
+                {filtered[lightbox + 1].photoUrl
+                  ? <img src={filtered[lightbox + 1].photoUrl!} alt="" className="block max-w-full max-h-full object-contain" referrerPolicy="no-referrer" />
+                  : <div className="w-[240px] h-[240px] rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${filtered[lightbox + 1].grad[0]}, ${filtered[lightbox + 1].grad[1]})` }}>
+                      <CheckCircle2 className="w-12 h-12 text-white/70" strokeWidth={1.8} />
+                    </div>
+                }
               </div>
             )}
           </div>
 
-          {/* 썸네일 스트립 — 가로 스크롤, 현재 사진 하이라이트 */}
+          {/* 썸네일 스트립 */}
           <div
             ref={thumbsRef}
             className="absolute left-0 right-0 overflow-x-auto no-scrollbar z-20"
-            style={{ bottom: 104, height: 68 }}
+            style={{ bottom: 84, height: 60 }}
             onTouchStart={e => e.stopPropagation()}
             onTouchMove={e => e.stopPropagation()}
             onTouchEnd={e => e.stopPropagation()}
@@ -695,12 +716,13 @@ export function Gallery() {
                   onClick={() => openLightbox(i)}
                   className="shrink-0 rounded-xl overflow-hidden transition-all duration-200"
                   style={{
-                    width: 52,
-                    height: 52,
-                    opacity: i === lightbox ? 1 : 0.38,
+                    width: 48,
+                    height: 48,
+                    opacity: i === lightbox ? 1 : 0.4,
                     transform: i === lightbox ? "scale(1.12)" : "scale(1)",
-                    outline: i === lightbox ? "2px solid rgba(255,255,255,0.85)" : "2px solid transparent",
+                    outline: i === lightbox ? "2px solid currentColor" : "2px solid transparent",
                     outlineOffset: "2px",
+                    color: "var(--lb-thumb-outline)",
                   }}
                 >
                   {photo.photoUrl
@@ -712,43 +734,35 @@ export function Gallery() {
             </div>
           </div>
 
-          {/* 하단 컨트롤 */}
+          {/* 하단 네비게이션 — 이전/다음 + 카운트 */}
           <div
-            className="absolute bottom-0 left-0 right-0 pt-3 pb-10 z-20"
-            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.55) 55%, transparent 100%)" }}
+            className="absolute bottom-0 left-0 right-0 pt-3 pb-8 z-20 bg-gradient-to-t from-white/90 via-white/55 dark:from-black/85 dark:via-black/55 to-transparent"
           >
             <div className="flex items-center justify-between px-5">
               <button
                 onClick={goPrev}
                 disabled={lightbox === 0}
-                className="w-11 h-11 rounded-full bg-white/10 border border-white/10 flex items-center justify-center active:bg-white/20 transition-colors disabled:opacity-20"
+                className="w-11 h-11 rounded-full bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 flex items-center justify-center active:bg-slate-200 dark:active:bg-white/20 transition-colors disabled:opacity-25"
               >
-                <ChevronLeft className="w-5 h-5 text-white" />
+                <ChevronLeft className="w-5 h-5 text-slate-700 dark:text-white" />
               </button>
-              <div className="flex items-center gap-3">
-                <p className="text-white/40 text-[12px] font-semibold tabular-nums">
-                  {lightbox + 1} / {filtered.length}
-                </p>
-                <button
-                  onClick={shareCurrentPhoto}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full active:scale-95 transition-all"
-                  style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.18)", backdropFilter: "blur(8px)" }}
-                >
-                  <Share2 className="w-3.5 h-3.5 text-white/70" />
-                  <span className="text-white/70 text-[11px] font-semibold">
-                    {shareState === "copied" ? "복사됨" : shareState === "shared" ? "완료" : "공유"}
-                  </span>
-                </button>
-              </div>
+              <p className="text-slate-500 dark:text-white/50 text-[12px] font-semibold tabular-nums">
+                {lightbox + 1} / {filtered.length}
+              </p>
               <button
                 onClick={goNext}
                 disabled={lightbox === filtered.length - 1}
-                className="w-11 h-11 rounded-full bg-white/10 border border-white/10 flex items-center justify-center active:bg-white/20 transition-colors disabled:opacity-20"
+                className="w-11 h-11 rounded-full bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 flex items-center justify-center active:bg-slate-200 dark:active:bg-white/20 transition-colors disabled:opacity-25"
               >
-                <ChevronRight className="w-5 h-5 text-white" />
+                <ChevronRight className="w-5 h-5 text-slate-700 dark:text-white" />
               </button>
             </div>
           </div>
+
+          <style>{`
+            .dark { --lb-thumb-outline: rgba(255,255,255,0.85); }
+            :root { --lb-thumb-outline: rgba(15,23,42,0.7); }
+          `}</style>
         </div>
       )}
     </div>

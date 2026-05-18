@@ -100,7 +100,7 @@ export function EditProfile() {
         >
           <ChevronLeft className="w-5 h-5 text-slate-700" />
         </button>
-        <h1 className="text-[17px] font-black text-slate-900">프로필 수정</h1>
+        <h1 className="text-[20px] font-black text-slate-900 tracking-tight">프로필 수정</h1>
         <button
           onClick={handleSave}
           disabled={saving}
@@ -120,7 +120,7 @@ export function EditProfile() {
         <div className="flex flex-col items-center pt-8 pb-6 bg-white border-b border-slate-100">
           <div className="relative mb-3">
             <div
-              className="w-24 h-24 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden"
+              className="w-24 h-24 rounded-2xl bg-slate-200 flex items-center justify-center overflow-hidden"
               style={{
                 border: "3px solid #FF3355",
                 boxShadow: "0 0 0 3px white, 0 6px 20px rgba(255,51,85,0.2)",
