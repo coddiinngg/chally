@@ -35,17 +35,23 @@ export async function loadActivityFeed(params: {
 }) {
   const { groupId = null, userId = null, limit = 30, withinChallengePeriod = false } = params;
 
-  // 챌린지 기간 필터를 위해 그룹 정보 조회
+  // 그룹 컨텍스트일 때는 현재 라운드(current_round)만 노출.
+  // withinChallengePeriod는 라운드 모델 도입 이전의 날짜 기반 필터로,
+  // round_number 도입 후에는 사실상 round_number 필터가 그 역할을 대체한다.
+  let currentRound: number | null = null;
   let challengeStart: string | null = null;
   let challengeEnd:   string | null = null;
-  if (groupId && withinChallengePeriod) {
+  if (groupId) {
     const { data: g } = await supabase
       .from("groups")
-      .select("challenge_start, challenge_end")
+      .select("current_round, challenge_start, challenge_end")
       .eq("id", groupId)
       .maybeSingle();
-    challengeStart = g?.challenge_start ?? null;
-    challengeEnd   = g?.challenge_end   ?? null;
+    currentRound = g?.current_round ?? 1;
+    if (withinChallengePeriod) {
+      challengeStart = g?.challenge_start ?? null;
+      challengeEnd   = g?.challenge_end   ?? null;
+    }
   }
 
   let query = supabase
@@ -55,6 +61,7 @@ export async function loadActivityFeed(params: {
     .limit(limit);
 
   if (groupId) query = query.eq("group_id", groupId);
+  if (currentRound !== null) query = query.eq("round_number", currentRound);
   if (challengeStart) query = query.gte("created_at", challengeStart);
   if (challengeEnd)   query = query.lte("created_at", challengeEnd);
 
@@ -64,15 +71,16 @@ export async function loadActivityFeed(params: {
   const ids = (posts ?? []).map(post => post.id);
   if (!ids.length) return [] as ActivityFeedItem[];
 
-  // 작성자 멤버 상태 (그룹 컨텍스트일 때만)
+  // 작성자 멤버 상태 (그룹 컨텍스트일 때만, 현재 라운드 기준)
   const memberStatusMap = new Map<string, AuthorMemberStatus>();
-  if (groupId) {
+  if (groupId && currentRound !== null) {
     const authorIds = Array.from(new Set((posts ?? []).map(p => p.user_id)));
     if (authorIds.length) {
       const { data: members } = await supabase
         .from("group_members")
         .select("user_id, member_status")
         .eq("group_id", groupId)
+        .eq("round_number", currentRound)
         .in("user_id", authorIds);
       (members ?? []).forEach(m => {
         memberStatusMap.set(m.user_id, m.member_status as AuthorMemberStatus);

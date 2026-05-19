@@ -21,10 +21,19 @@ export async function loadGroupMessages(params: {
   limit?: number;
 }) {
   const { groupId, userId = null, limit = 50 } = params;
+
+  const { data: groupRow } = await supabase
+    .from("groups")
+    .select("current_round")
+    .eq("id", groupId)
+    .maybeSingle();
+  const currentRound = groupRow?.current_round ?? 1;
+
   const { data: rows, error } = await supabase
     .from("group_messages")
     .select("*")
     .eq("group_id", groupId)
+    .eq("round_number", currentRound)
     .order("created_at", { ascending: false })
     .limit(limit);
 

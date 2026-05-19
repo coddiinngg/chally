@@ -61,6 +61,7 @@ export interface Database {
           photo_url: string | null;
           status: 'completed' | 'skipped';
           xp_earned: number;
+          round_number: number | null;
         };
         Insert: {
           id?: string;
@@ -98,6 +99,7 @@ export interface Database {
           challenge_end: string | null;
           crew_rate: number;
           crew_grade: string;
+          current_round: number;
         };
         Insert: {
           id?: string;
@@ -120,6 +122,7 @@ export interface Database {
           challenge_end?: string | null;
           crew_rate?: number;
           crew_grade?: string;
+          current_round?: number;
         };
         Update: Partial<Omit<Database['public']['Tables']['groups']['Insert'], 'created_by' | 'id'>>;
         Relationships: [];
@@ -138,6 +141,7 @@ export interface Database {
           removed_at: string | null;
           join_day: number;
           benefit_claimed_at: string | null;
+          round_number: number;
         };
         Insert: {
           id?: string;
@@ -215,6 +219,7 @@ export interface Database {
           category: '운동/건강' | '독서/공부' | '생산성' | '마음챙김' | '식습관' | '기타';
           duration: '7일' | '21일' | '30일';
           verify_method: string | null;
+          cover_url: string | null;
           operator_comment: string | null;
           created_by: string | null;
           votes_count: number;
@@ -231,6 +236,7 @@ export interface Database {
           category: '운동/건강' | '독서/공부' | '생산성' | '마음챙김' | '식습관' | '기타';
           duration: '7일' | '21일' | '30일';
           verify_method?: string | null;
+          cover_url?: string | null;
           operator_comment?: string | null;
           created_by?: string | null;
           votes_count?: number;
@@ -371,6 +377,7 @@ export interface Database {
           author_name: string | null;
           author_avatar_url: string | null;
           created_at: string;
+          round_number: number;
         };
         Insert: {
           id?: string;
@@ -411,6 +418,7 @@ export interface Database {
           author_name: string | null;
           author_avatar_url: string | null;
           created_at: string;
+          round_number: number;
         };
         Insert: {
           id?: string;

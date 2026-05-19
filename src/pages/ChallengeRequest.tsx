@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, Search, ChevronUp, ChevronDown, MessageCircle, Share2,
-  Bell, Plus, X, Flame, CheckCircle, Clock, Send, Heart, ArrowRight,
+  Bell, Plus, X, Flame, CheckCircle, Clock, Send, Heart, ArrowRight, ImageIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { shareOrCopy } from "../lib/share";
@@ -435,6 +435,7 @@ function NewRequestView({ onBack, onCreate }: { onBack: () => void; onCreate: (p
   category: Category;
   duration: Duration;
   verifyMethod?: string | null;
+  coverFile?: File | null;
 }) => Promise<void> }) {
   const [step, setStep]         = useState(0);
   const [dir, setDir]           = useState<"forward" | "back">("forward");
@@ -443,6 +444,8 @@ function NewRequestView({ onBack, onCreate }: { onBack: () => void; onCreate: (p
   const [duration, setDuration] = useState<Duration2 | null>(null);
   const [category, setCategory] = useState<Category2 | null>(null);
   const [verifyMethod, setVerifyMethod] = useState("");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -468,6 +471,7 @@ function NewRequestView({ onBack, onCreate }: { onBack: () => void; onCreate: (p
           category,
           duration,
           verifyMethod: verifyMethod.trim() || null,
+          coverFile,
         });
         setSubmitted(true);
       } catch (err) {
@@ -551,6 +555,20 @@ function NewRequestView({ onBack, onCreate }: { onBack: () => void; onCreate: (p
         </button>
       </div>
     );
+  }
+
+  function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverFile(file);
+    const url = URL.createObjectURL(file);
+    setCoverPreview(url);
+  }
+
+  function removeCover() {
+    if (coverPreview) URL.revokeObjectURL(coverPreview);
+    setCoverFile(null);
+    setCoverPreview("");
   }
 
   const durations: Duration2[]  = ["7일", "21일", "30일"];
@@ -657,6 +675,29 @@ function NewRequestView({ onBack, onCreate }: { onBack: () => void; onCreate: (p
                 placeholder="예) 완료 사진 또는 영상"
                 className="w-full text-[15px] text-slate-800 placeholder-slate-300 outline-none pb-3 border-b-2 border-slate-200 focus:border-slate-900 transition-colors bg-transparent"
               />
+            </div>
+
+            {/* 커버 사진 */}
+            <div>
+              <p className="text-[13px] font-semibold text-slate-600 mb-2">커버 사진 <span className="text-slate-400 font-normal">(선택)</span></p>
+              {coverPreview ? (
+                <div className="relative w-full h-40 rounded-2xl overflow-hidden">
+                  <img src={coverPreview} alt="커버 미리보기" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={removeCover}
+                    className="absolute top-2 right-2 w-7 h-7 bg-black/50 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+                  >
+                    <X className="w-4 h-4 text-white" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center gap-2 w-full h-32 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer text-slate-400 active:bg-slate-50 transition-colors">
+                  <ImageIcon className="w-6 h-6" />
+                  <span className="text-[13px]">사진 선택</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
+                </label>
+              )}
             </div>
           </div>
         )}
@@ -968,8 +1009,24 @@ export function ChallengeRequest() {
     category: Category;
     duration: Duration;
     verifyMethod?: string | null;
+    coverFile?: File | null;
   }) {
     if (!user) throw new Error("로그인 후 건의할 수 있어요.");
+
+    let coverUrl: string | null = null;
+    if (params.coverFile) {
+      const ext = params.coverFile.name.split(".").pop() ?? "jpg";
+      const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("suggestion-covers")
+        .upload(path, params.coverFile, { contentType: params.coverFile.type });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage
+        .from("suggestion-covers")
+        .getPublicUrl(path);
+      coverUrl = publicUrl;
+    }
+
     const { data, error } = await supabase
       .from("challenge_suggestions")
       .insert({
@@ -978,6 +1035,7 @@ export function ChallengeRequest() {
         category: params.category,
         duration: params.duration,
         verify_method: params.verifyMethod,
+        cover_url: coverUrl,
         created_by: user.id,
       })
       .select("*")

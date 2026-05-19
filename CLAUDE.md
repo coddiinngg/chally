@@ -299,12 +299,12 @@ ACTIVE -> 48h 미인증 -> EXIT_ELIGIBLE -> 24h 경과 -> REMOVED
 ### 주요 테이블
 
 - `profiles`: auth user 확장. `username`, `avatar_url`, `plan_type`, `streak_count`, `participation_tickets`, `xp_total`, `invite_code`, `referred_by`
-- `groups`: `legacy_id`, `name`, `emoji`, `description`, `category`, `member_count`, `rule`, `goal`, `verify_type`, `cover`, `max_members`, `is_public`, `recruit_start/end`, `challenge_start/end`, `crew_rate`, `crew_grade`
-- `group_members`: `group_id`, `user_id`, `role`, `joined_at`, `last_verified_at`, `is_contributor`, `member_status`, `exit_deadline`, `removed_at`, `join_day`, `benefit_claimed_at`
-- `verifications`: `user_id`, nullable `group_id`, `verify_type`, `verified_at`, `photo_url`, `status`, `xp_earned`
-- `activity_posts`: 그룹 인증 피드. `verification_id`는 unique
+- `groups`: `legacy_id`, `name`, `emoji`, `description`, `category`, `member_count`, `rule`, `goal`, `verify_type`, `cover`, `max_members`, `is_public`, `recruit_start/end`, `challenge_start/end`, `crew_rate`, `crew_grade`, `current_round`
+- `group_members`: `group_id`, `user_id`, `role`, `joined_at`, `last_verified_at`, `is_contributor`, `member_status`, `exit_deadline`, `removed_at`, `join_day`, `benefit_claimed_at`, `round_number`
+- `verifications`: `user_id`, nullable `group_id`, `verify_type`, `verified_at`, `photo_url`, `status`, `xp_earned`, `round_number` (group_id가 NULL이면 round_number도 NULL)
+- `activity_posts`: 그룹 인증 피드. `verification_id`는 unique. `round_number`
 - `activity_reactions`: activity post당 유저 1개 리액션
-- `group_messages`: 홈 채팅 메시지. body 1~500자
+- `group_messages`: 홈 채팅 메시지. body 1~500자. `round_number`
 - `group_message_reactions`: 메시지당 유저 1개 리액션
 - `notifications`: 확장 타입 포함. INSERT는 service role/트리거 경로
 - `notification_settings`: 일일/챌린지/주간/성과 알림 설정
@@ -338,6 +338,7 @@ ACTIVE -> 48h 미인증 -> EXIT_ELIGIBLE -> 24h 경과 -> REMOVED
 | `search_public_profiles(p_query, p_limit)` | 닉네임 검색 |
 | `get_crew_status(p_group_id)` | crew status와 내 멤버 상태 |
 | `calculate_crew_rate(p_group_id)` | 크루 달성률 계산 |
+| `reopen_group(p_group_id, p_challenge_start, p_challenge_end, p_recruit_start?, p_recruit_end?)` | 같은 그룹 row의 `current_round`를 +1, 기간/달성률 리셋, `challenge_reopen_subscriptions` 구독자에게 알림 발송. service role 전용 (PUBLIC EXECUTE 회수됨) |
 
 service role/cron 성격:
 
@@ -349,7 +350,9 @@ service role/cron 성격:
 
 내부 트리거/헬퍼:
 
-`adjust_group_member_count`, `default_invite_code`, `handle_new_user`, `refresh_challenge_suggestion_counts`, `set_member_contributor`, `grade_from_rate`, `trg_fn_crew_rate_on_verification`, `trg_fn_reset_on_challenge_restart`, `notify_group_on_verification`, `notify_group_on_streak`, `notify_group_on_chat`, `update_updated_at`.
+`adjust_group_member_count`, `default_invite_code`, `handle_new_user`, `refresh_challenge_suggestion_counts`, `set_member_contributor`, `grade_from_rate`, `trg_fn_crew_rate_on_verification`, `trg_fn_reset_on_challenge_restart`, `trg_fn_stamp_round_number`, `notify_group_on_verification`, `notify_group_on_streak`, `notify_group_on_chat`, `notify_reopen_subscribers`, `update_updated_at`.
+
+`trg_fn_stamp_round_number`은 `group_messages`/`activity_posts`/`verifications`/`group_members` BEFORE INSERT에 붙어 있으며 `groups.current_round` 값을 자동으로 박는다. 라운드 모델 도입 이후 라운드별 데이터는 "삭제하지 않고 round_number로 태깅 → UI 필터로 비노출" 원칙을 따른다 (자산 보존).
 
 ### Realtime
 
@@ -405,6 +408,10 @@ service role/cron 성격:
 | `20260518100000` | `release_rpcs_and_deletion_requests` | 5개 출시 RPC + `account_deletion_requests` 테이블 |
 | `20260518110000` | `drop_direct_write_policies` | profiles/verifications/groups/group_members 직접 write 정책 11개 제거. 모든 client write는 RPC 경유 |
 | `20260518120000` | `account_deletion_audit_preserve` | `account_deletion_requests.user_id` FK를 ON DELETE SET NULL으로 변경. 유저 삭제 후에도 감사 로그 row 보존 |
+| `20260519000000` | `reset_group_messages_on_challenge_restart` | 챌린지 재시작 트리거에서 이전 회차 채팅 DELETE (이후 Phase 1에서 라운드 모델로 대체되며 DELETE 동작 제거됨) |
+| `20260519010000` | `round_number_phase1` | 라운드 모델 도입: `groups.current_round`, `group_messages`/`activity_posts`/`verifications`/`group_members.round_number`, 자동 stamp 트리거, 재시작 트리거에서 DELETE 제거, `reopen_group` RPC |
+| `20260519020000` | `round_filter_rpcs` | `calculate_crew_rate`/`get_group_leaderboard`/`get_crew_status`에 `round_number = current_round` 필터 추가 |
+| `20260519030000` | `group_members_round_key` | group_members 유니크 키 `(group_id, user_id)` → `(group_id, user_id, round_number)`. `join_group_with_ticket`/`leave_group`/`claim_participation_benefit`/`update_member_statuses`가 현재 라운드 row 기준으로 동작. LEFT/REMOVED는 그 라운드 내에서만 영구 |
 
 ## 작업 시 주의사항
 

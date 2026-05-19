@@ -56,6 +56,7 @@ const DEMO_ACTIVITY_POSTS: ActivityFeedItem[] = Array.from({ length: 12 }, (_, i
   author_name: DEMO_NAMES[i % DEMO_NAMES.length],
   author_avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=demo-${i % DEMO_NAMES.length}`,
   created_at: new Date(Date.now() - i * 3600000).toISOString(),
+  round_number: 1,
   reactionCount: Math.floor(Math.random() * 8),
   myReaction: null,
   authorMemberStatus: "ACTIVE",

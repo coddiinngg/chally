@@ -522,9 +522,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const exitEligibleDbIds  = new Set<string>();
 
     if (user) {
+      // 현재 라운드(group.current_round) 멤버십만 노출. 과거 라운드 LEFT/REMOVED는
+      // 화면 표시에 영향 없음 (그 라운드 내에서만 영구).
       const { data: memberships, error: membershipsError } = await supabase
         .from("group_members")
-        .select("group_id, member_status")
+        .select("group_id, member_status, round_number")
         .eq("user_id", user.id);
 
       if (membershipsError) {
@@ -533,7 +535,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setGroupsLoading(false);
         return;
       }
-      memberships?.forEach(item => {
+      const currentRoundByGroup = new Map(dbGroups.map(g => [g.id, g.current_round]));
+      const currentRoundOnly = (memberships ?? []).filter(m => m.round_number === currentRoundByGroup.get(m.group_id));
+      currentRoundOnly.forEach(item => {
         if (item.member_status === "REMOVED") {
           removedDbIds.add(item.group_id);
         } else if (item.member_status === "LEFT") {

@@ -238,6 +238,7 @@ interface VerificationGroup {
   challenge_end: string | null;
   goal: string | null;
   name: string | null;
+  current_round: number;
 }
 
 /** 타입별 서버사이드 이중 검증: AI가 통과시켜도 서버에서 재확인 */
@@ -408,7 +409,7 @@ serve(async (req) => {
   if (groupId) {
     const { data: group, error: groupError } = await serviceClient
       .from("groups")
-      .select("id, verify_type, challenge_start, challenge_end, goal, name")
+      .select("id, verify_type, challenge_start, challenge_end, goal, name, current_round")
       .eq("id", groupId)
       .maybeSingle();
 
@@ -440,6 +441,7 @@ serve(async (req) => {
       .select("group_id, member_status")
       .eq("group_id", groupId)
       .eq("user_id", user.id)
+      .eq("round_number", verifiedGroup.current_round)
       .maybeSingle();
 
     if (membershipError) {
@@ -581,7 +583,7 @@ serve(async (req) => {
         console.error("Activity post insert failed:", activityError);
       }
 
-      // 인증 성공 → 멤버 상태 초기화 + 달성률 갱신
+      // 인증 성공 → 현재 라운드 멤버 row의 상태 초기화 + 달성률 갱신
       const { error: memberUpdateError } = await serviceClient
         .from("group_members")
         .update({
@@ -589,8 +591,9 @@ serve(async (req) => {
           member_status:    "ACTIVE",
           exit_deadline:    null,
         })
-        .eq("group_id", verifiedGroupId)
-        .eq("user_id",  user.id);
+        .eq("group_id",     verifiedGroupId)
+        .eq("user_id",      user.id)
+        .eq("round_number", verifiedGroup!.current_round);
       if (memberUpdateError) {
         console.error("[verify-photo] Member status update failed:", memberUpdateError);
       }

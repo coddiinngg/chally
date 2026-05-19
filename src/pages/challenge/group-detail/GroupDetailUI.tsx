@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ChevronLeft, Share2, Flame, Crown, Copy, Check, X, Camera, MoreHorizontal, LogOut, AlertTriangle, ShieldCheck, ShieldOff, Clock, Trophy } from "lucide-react";
+import { ChevronLeft, Share2, Flame, Crown, Copy, Check, X, Camera, MoreHorizontal, LogOut, ShieldCheck, ShieldOff, Clock, Trophy } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { cn } from "../../../lib/utils";
 import { useApp } from "../../../contexts/AppContext";
@@ -64,6 +64,34 @@ const rateColor = (r: number) =>
 
 const gradeColor = (g: string) =>
   g === "A" ? "#10B981" : g === "B" ? "#F59E0B" : g === "C" ? "#3B82F6" : "#94A3B8";
+
+function localDateKey(value: Date | string = new Date()) {
+  const date = typeof value === "string" ? new Date(value) : value;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function groupNoticeKey(kind: "start" | "low-rate", groupKey: string, userKey: string, dayKey: string, scope = "") {
+  return `chally-gd-notice-v1-${kind}-${userKey}-${groupKey}-${scope}-${dayKey}`;
+}
+
+function hasStoredNotice(key: string) {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function storeNotice(key: string) {
+  try {
+    localStorage.setItem(key, "1");
+  } catch {
+    // Ignore private-mode/quota errors; the banner can still be dismissed in memory.
+  }
+}
 
 export function GroupDetailUI() {
   const navigate = useNavigate();
@@ -131,29 +159,42 @@ export function GroupDetailUI() {
 
   const groupDbId = group?.dbId ?? null;
   const phase = getPhase(group?.challengeStart ?? null, group?.challengeEnd ?? null, group?.recruitEnd ?? null);
+  const noticeGroupKey = groupDbId ?? groupId;
+  const noticeUserKey = user?.id ?? "guest";
   // 조회 전용 상태 (REMOVED/LEFT) — 리액션 등 액션 차단용
   const isViewerOnly = !!(group?.isRemoved || group?.isLeft || crewStatus?.my_status === "REMOVED");
 
-  // 챌린지 시작 안내 배너: 참여중이고 오늘이 챌린지 시작일인 경우
+  // 챌린지 시작 안내 배너: 참여중이고 오늘이 챌린지 시작일인 경우에만 노출.
   useEffect(() => {
-    if (!group?.joined || !group?.challengeStart) return;
-    const start = new Date(group!.challengeStart!);
-    const now = new Date();
-    const isStartDay = start.toDateString() === now.toDateString();
-    const bannerKey = `start-banner-${groupId}`;
-    if (isStartDay && !sessionStorage.getItem(bannerKey)) {
-      setShowStartBanner(true);
+    if (!group?.joined || !group?.challengeStart) {
+      setShowStartBanner(false);
+      return;
     }
-  }, [group?.joined, group?.challengeStart, groupId]);
 
-  // 저조한 크루 알림: 챌린지 진행 중이고 달성률 39% 이하인 경우
+    const todayKey = localDateKey();
+    const startDayKey = localDateKey(group.challengeStart);
+    const bannerKey = groupNoticeKey("start", noticeGroupKey, noticeUserKey, todayKey, startDayKey);
+
+    setShowStartBanner(startDayKey === todayKey && !hasStoredNotice(bannerKey));
+  }, [group?.joined, group?.challengeStart, noticeGroupKey, noticeUserKey]);
+
+  // 저조한 크루 알림: 챌린지 진행 중이고 달성률 39% 이하인 경우 하루 1회 노출.
   useEffect(() => {
-    if (!group?.joined || (phase !== "active" && phase !== "closing") || (group?.crewRate ?? 100) > 39) return;
-    const alertKey = `low-rate-alert-${groupId}-${new Date().toDateString()}`;
-    if (!sessionStorage.getItem(alertKey)) {
-      setShowLowRateAlert(true);
+    if (!group?.joined || (phase !== "active" && phase !== "closing") || (group?.crewRate ?? 100) > 39) {
+      setShowLowRateAlert(false);
+      return;
     }
-  }, [group?.joined, group?.crewRate, groupId]);
+
+    const todayKey = localDateKey();
+    const alertKey = groupNoticeKey("low-rate", noticeGroupKey, noticeUserKey, todayKey);
+
+    setShowLowRateAlert(current => {
+      if (current) return true;
+      const shouldShow = !hasStoredNotice(alertKey);
+      if (shouldShow) storeNotice(alertKey);
+      return shouldShow;
+    });
+  }, [group?.joined, group?.crewRate, phase, noticeGroupKey, noticeUserKey]);
 
   // 48시간 미인증 체크: 진행 중 챌린지 + 현재 챌린지 기간 인증만 확인
   useEffect(() => {
@@ -523,7 +564,11 @@ export function GroupDetailUI() {
               <button
                 className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-white/20 active:bg-white/30 transition-colors"
                 onClick={() => {
-                  sessionStorage.setItem(`start-banner-${groupId}`, "1");
+                  if (group.challengeStart) {
+                    const todayKey = localDateKey();
+                    const startDayKey = localDateKey(group.challengeStart);
+                    storeNotice(groupNoticeKey("start", noticeGroupKey, noticeUserKey, todayKey, startDayKey));
+                  }
                   setShowStartBanner(false);
                 }}>
                 <X className="w-3.5 h-3.5 text-white" />
@@ -532,30 +577,30 @@ export function GroupDetailUI() {
           </div>
         )}
 
-        {/* ── 저조한 크루 달성률 경고 배너 ── */}
+        {/* ── 크루 달성률 격려 배너 ── */}
         {showLowRateAlert && (
-          <div className="mx-4 mt-4 rounded-2xl overflow-hidden bg-red-50 border border-red-100"
+          <div className="mx-4 mt-4 rounded-2xl overflow-hidden bg-amber-50 border border-amber-100"
             style={{ animation: "noti-drop 0.3s ease both" }}>
             <div className="px-4 py-3.5 flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+              <span className="text-xl shrink-0 mt-0.5">💪</span>
               <div className="flex-1 min-w-0">
-                <p className="text-red-600 font-black text-[13px] mb-0.5">크루 달성률이 낮아요 ({group.crewRate}%)</p>
-                <p className="text-red-500 text-[12px] leading-relaxed">앞으로 매일 인증해야 챌린지를 달성할 수 있어요!</p>
+                <p className="text-amber-700 font-black text-[13px] mb-0.5">함께 100%를 향해 가요 ({group.crewRate}%)</p>
+                <p className="text-amber-600 text-[12px] leading-relaxed">오늘 인증으로 크루 달성률을 한 칸 더 올려봐요!</p>
               </div>
               <button
                 className="shrink-0 w-6 h-6 flex items-center justify-center"
                 onClick={() => {
-                  sessionStorage.setItem(`low-rate-alert-${groupId}-${new Date().toDateString()}`, "1");
+                  storeNotice(groupNoticeKey("low-rate", noticeGroupKey, noticeUserKey, localDateKey()));
                   setShowLowRateAlert(false);
                 }}>
-                <X className="w-4 h-4 text-red-300" />
+                <X className="w-4 h-4 text-amber-400" />
               </button>
             </div>
             <div className="px-4 pb-3">
               <button
-                className="w-full py-2 rounded-xl bg-red-100 text-red-600 text-[13px] font-bold active:bg-red-200 transition-colors"
+                className="w-full py-2 rounded-xl bg-amber-100 text-amber-700 text-[13px] font-bold active:bg-amber-200 transition-colors"
                 onClick={() => {
-                  sessionStorage.setItem(`low-rate-alert-${groupId}-${new Date().toDateString()}`, "1");
+                  storeNotice(groupNoticeKey("low-rate", noticeGroupKey, noticeUserKey, localDateKey()));
                   setShowLowRateAlert(false);
                   startVerification();
                 }}>
