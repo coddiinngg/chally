@@ -1028,7 +1028,7 @@ export function GroupDetailUI() {
             className="w-full h-14 flex items-center justify-center gap-2.5 rounded-2xl text-white font-black text-[16px] active:scale-[0.98] transition-transform"
             style={{ background: PG, boxShadow: PS }}>
             <Camera className="w-5 h-5" />
-            {vt.emoji} 오늘의 인증하기
+            오늘 인증하기
           </button>
 
         /* 미참여 → 참여하기 */

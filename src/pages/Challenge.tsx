@@ -170,9 +170,9 @@ export function Challenge() {
     .filter((g) => {
       const phase = getPhase(g.challengeStart, g.challengeEnd, g.recruitEnd);
 
-      // "지난 챌린지" 모드: ACTIVE로 끝까지 참여한 ended 그룹만 (LEFT/REMOVED 제외)
+      // "지난 챌린지" 모드: 참여 이력이 있는 모든 종료된 그룹 (LEFT/REMOVED 포함)
       if (filterMode === "지난") {
-        return g.joined && phase === "ended" && !g.isRemoved && !g.isLeft;
+        return phase === "ended" && (g.joined || g.isLeft || g.isRemoved);
       }
 
       // "참여중" 모드: 현재 active/closing/recruit인 내 그룹만 (ended/LEFT/REMOVED 제외)
