@@ -600,29 +600,51 @@ export function Home() {
       `}</style>
 
       {/* 헤더 */}
-      <header className="shrink-0 bg-white z-10 px-6 pt-3 pb-1 relative"
+      <header className="shrink-0 bg-white z-10 px-5 pt-3 pb-2 relative"
         style={{ animation: isReturnVisit ? "none" : "hm-in 0.4s ease both", borderBottom: "1px solid rgba(0,0,0,0.04)" }}>
         <div className="flex items-center justify-between">
+          {/* 로고 + 워드마크 */}
+          <div className="flex items-center gap-0">
+            <img
+              src="/chally-logo-icon.png"
+              alt=""
+              width={32}
+              height={32}
+              className="w-8 h-8 object-contain shrink-0"
+              style={{
+                imageRendering: "-webkit-optimize-contrast" as React.CSSProperties["imageRendering"],
+                filter: "contrast(1.08) saturate(1.15)",
+              }}
+            />
+            <span
+              className="font-black text-[24px] leading-none tracking-[-0.03em] mt-1.5"
+              style={{ color: "#FF3355" }}
+            >
+              Chally
+            </span>
+          </div>
+
+          {/* 건의함 · 알림 · 프로필 */}
           <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-xl bg-[#FF3355] flex items-center justify-center text-white font-black text-[16px] shrink-0 shadow-[0_4px_12px_rgba(255,51,85,0.35)] overflow-hidden"
+            <button onClick={() => navigate("/challenge/request")}
+              aria-label="건의함"
+              className="w-8 h-8 flex items-center justify-center rounded-full active:bg-slate-100 transition-colors">
+              <Lightbulb className="w-[22px] h-[22px] text-slate-700" />
+            </button>
+            <button onClick={() => navigate("/notifications")}
+              aria-label="알림"
+              className="relative w-8 h-8 flex items-center justify-center rounded-full active:bg-slate-100 transition-colors">
+              <Bell className="w-[22px] h-[22px] text-slate-700" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#FF3355] ring-2 ring-white" />
+              )}
+            </button>
+            <button onClick={() => navigate("/profile")}
+              aria-label="프로필"
+              className="w-8 h-8 rounded-full bg-[#FF3355] flex items-center justify-center text-white font-black text-[12px] shrink-0 overflow-hidden active:scale-95 transition-transform"
               style={avatarUrl ? { backgroundImage: `url("${avatarUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
             >
               {!avatarUrl && nickname.charAt(0)}
-            </div>
-            <p className="text-slate-900 font-black text-[20px] leading-none tracking-tight">{nickname}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => navigate("/challenge/request")}
-              className="relative w-9 h-9 flex items-center justify-center rounded-full bg-[#FF3355]/10 active:bg-[#FF3355]/20 transition-colors">
-              <Lightbulb className="w-5 h-5 text-[#FF3355]" />
-            </button>
-            <button onClick={() => navigate("/notifications")}
-              className="relative w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 active:bg-slate-200 transition-colors">
-              <Bell className="w-5 h-5 text-slate-500" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#FF3355]" />
-              )}
             </button>
           </div>
         </div>
