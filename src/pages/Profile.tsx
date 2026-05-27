@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Bell, LogOut, Ticket, Pencil, ChevronRight, Award, UserPlus, Moon, Sun, Smartphone, Trash2, AlertTriangle, Trophy, Flame, TrendingUp } from "lucide-react";
+import { Bell, LogOut, Ticket, Pencil, ChevronRight, Award, UserPlus, Moon, Sun, Smartphone, Trash2, AlertTriangle, Trophy, ImageIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -33,7 +33,7 @@ const CARD_SHADOW = "0 2px 8px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)";
 
 export function Profile() {
   const navigate = useNavigate();
-  const { nickname, theme, setTheme, participationTickets, verificationHistory, groupsLoading } = useApp();
+  const { nickname, theme, setTheme, participationTickets, verificationHistory, groupsLoading, groups } = useApp();
   const { signOut, profile } = useAuth();
   const { guardAction } = useGuestGuard();
   const [mounted, setMounted] = useState(() => isReturningVisit("pf-scroll"));
@@ -49,18 +49,11 @@ export function Profile() {
   const avatarUrl = profile?.avatar_url ?? null;
   const avatarInitial = (nickname || "?").charAt(0).toUpperCase();
 
-  const totalDone = verificationHistory.filter((v) => v.status === "completed").length;
-  const currentStreak = profile?.streak_count ?? 0;
-  const uniqueDaysLast30 = new Set(
-    verificationHistory
-      .filter(v => v.status === "completed" && (Date.now() - new Date(v.verified_at).getTime()) < 30 * 86400000)
-      .map(v => v.verified_at.slice(0, 10))
-  ).size;
-  const successRate = Math.round(uniqueDaysLast30 / 30 * 100);
+  const completedVerifications = verificationHistory.filter((v) => v.status === "completed");
+  const photoCount = completedVerifications.filter(v => v.photo_url).length;
+  const recentPhotoThumbs = completedVerifications.filter(v => v.photo_url).slice(0, 5).map(v => ({ id: v.id, src: v.photo_url as string }));
+  const totalParticipated = groups.filter(g => g.joined && !g.isRemoved && !g.isLeft).length;
 
-  const xpAnim = useCountUp(totalDone, 900, 400);
-  const streakAnim = useCountUp(currentStreak, 900, 500);
-  const rateAnim = useCountUp(successRate, 900, 600);
   const ticketAnim = useCountUp(participationTickets, 900, 700);
 
   const xpPct = nextGrade ? Math.min(((xpTotal - grade.minXp) / (nextGrade.minXp - grade.minXp)) * 100, 100) : 100;
@@ -186,57 +179,65 @@ export function Profile() {
             )}
           </div>
 
-          {/* 벤토 통계 그리드 */}
-          <div className="grid grid-cols-2 gap-3" style={slide(120)}>
-            {/* 달성 (큰 타일, row-span-2) */}
+          {/* 나의 챌린지 */}
+          <div
+            onClick={() => navigate("/stats/challenge-history")}
+            className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.04] active:scale-[0.98] transition-transform duration-150 cursor-pointer"
+            style={{ ...slide(90), boxShadow: CARD_SHADOW }}
+          >
             <div
-              className="row-span-2 bg-white rounded-2xl border border-black/[0.04] p-5 flex flex-col justify-between min-h-[180px]"
-              style={{ boxShadow: CARD_SHADOW }}
+              className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: "linear-gradient(135deg,#FF3355,#ff5570)", boxShadow: "0 4px 14px rgba(255,51,85,0.3)" }}
             >
-              <div>
-                <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center mb-3.5">
-                  <Trophy className="w-5 h-5 text-amber-500" strokeWidth={2.4} />
+              <Trophy className="w-6 h-6 text-white" strokeWidth={2.2} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[14px] font-black text-slate-900">나의 챌린지</p>
+              <p className="text-[12px] text-slate-400 mt-0.5">
+                {totalParticipated > 0 ? `총 ${totalParticipated}개 참여 · 이전 기록 보기` : "아직 참여한 챌린지가 없어요"}
+              </p>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-[#FFE8EC] flex items-center justify-center shrink-0">
+              <ChevronRight className="w-4 h-4 text-[#FF3355]" />
+            </div>
+          </div>
+
+          {/* 인증 히스토리 */}
+          <div
+            onClick={() => navigate("/gallery")}
+            className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.04] active:scale-[0.98] transition-transform duration-150 cursor-pointer"
+            style={{ ...slide(105), boxShadow: CARD_SHADOW }}
+          >
+            <div className="shrink-0">
+              {recentPhotoThumbs.length > 0 ? (
+                <div className="flex -space-x-2">
+                  {recentPhotoThumbs.map(thumb => (
+                    <button
+                      key={thumb.id}
+                      onClick={e => { e.stopPropagation(); navigate("/gallery", { state: { openId: thumb.id } }); }}
+                      className="rounded-xl overflow-hidden border-2 border-white shrink-0 active:scale-90 transition-transform"
+                    >
+                      <img src={thumb.src} alt="최근 인증" className="w-10 h-10 object-cover" referrerPolicy="no-referrer" />
+                    </button>
+                  ))}
                 </div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.14em]">총 달성</p>
-              </div>
-              <div>
-                <p className="text-[36px] font-black text-slate-900 leading-none tabular-nums">
-                  {xpAnim}<span className="text-[15px] text-slate-400 ml-1 font-bold">회</span>
-                </p>
-                <p className="text-[11px] text-slate-400 mt-2 font-medium">전체 인증</p>
-              </div>
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center">
+                  <ImageIcon className="w-5 h-5 text-slate-400" />
+                </div>
+              )}
             </div>
-
-            {/* 연속 */}
-            <div
-              className="bg-white rounded-2xl border border-black/[0.04] p-4 flex items-center gap-3"
-              style={{ boxShadow: CARD_SHADOW }}
-            >
-              <div className="w-11 h-11 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
-                <Flame className="w-5 h-5 text-orange-500" strokeWidth={2.4} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <ImageIcon className="w-3.5 h-3.5 text-[#FF3355]" />
+                <p className="text-[14px] font-black text-slate-900">인증 히스토리</p>
               </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.14em] mb-1">연속</p>
-                <p className="text-[22px] font-black text-slate-900 leading-none tabular-nums">
-                  {streakAnim}<span className="text-[12px] text-slate-400 ml-1 font-bold">일</span>
-                </p>
-              </div>
+              <p className="text-[12px] text-slate-400">
+                {photoCount > 0 ? `총 ${photoCount}장 · 갤러리에서 확인` : "아직 저장된 인증 사진이 없어요"}
+              </p>
             </div>
-
-            {/* 성공률 */}
-            <div
-              className="bg-white rounded-2xl border border-black/[0.04] p-4 flex items-center gap-3"
-              style={{ boxShadow: CARD_SHADOW }}
-            >
-              <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
-                <TrendingUp className="w-5 h-5 text-emerald-500" strokeWidth={2.4} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.14em] mb-1">성공률</p>
-                <p className="text-[22px] font-black text-slate-900 leading-none tabular-nums">
-                  {rateAnim}<span className="text-[12px] text-slate-400 ml-1 font-bold">%</span>
-                </p>
-              </div>
+            <div className="w-8 h-8 rounded-full bg-[#FFE8EC] flex items-center justify-center shrink-0">
+              <ChevronRight className="w-4 h-4 text-[#FF3355]" />
             </div>
           </div>
 

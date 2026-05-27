@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
-import { TrendingUp, Flame, Calendar, Trophy, CheckCircle2, ChevronRight, ImageIcon, ChevronLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { TrendingUp, Flame, Calendar, Trophy, ChevronRight, ChevronLeft, Users, Award, Zap, Sparkles } from "lucide-react";
 import { useApp } from "../contexts/AppContext";
+import { useAuth } from "../contexts/AuthContext";
 import { useScrollRestoration, isReturningVisit, usePersistedNumber } from "../lib/useScrollRestoration";
+
+const CARD_SHADOW = "0 2px 8px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)";
 
 function useCountUp(target: number, duration = 900, delay = 0) {
   const [val, setVal] = useState(0);
@@ -123,7 +125,7 @@ function CalendarHeatmap({
 
 export function Stats() {
   const { verificationHistory, verificationLoading, groups } = useApp();
-  const navigate = useNavigate();
+  const { profile } = useAuth();
   const [mounted, setMounted] = useState(() => isReturningVisit("st-scroll"));
   const [calOffset, setCalOffset] = usePersistedNumber("st-cal-offset", 0);
   const calendarRef = useRef<HTMLDivElement | null>(null);
@@ -203,16 +205,23 @@ export function Stats() {
   const daysInMonth = new Date(calYear, calMonthIndex + 1, 0).getDate();
   const missedDays = Math.max(0, calToday - doneDays);
   const remainingDays = isCurrentMonth ? daysInMonth - calToday : 0;
-  const photoCount = completedVerifications.filter(item => item.photo_url).length;
-  const recentPhotoThumbs = completedVerifications.filter(item => item.photo_url).slice(0, 5).map(item => ({ id: item.id, src: item.photo_url as string }));
-
   // 달성률: 이번 달 오늘까지 중 인증 있는 날 비율
   const successRate = calToday > 0 ? Math.round((doneDays / calToday) * 100) : 0;
 
   // 참여 중인 챌린지 수 (ACTIVE/EXIT_ELIGIBLE) — LEFT/REMOVED는 제외
   const joinedCount = groups.filter(g => g.joined).length;
-  // 참여했던 챌린지: ACTIVE로 끝까지 참여한 그룹만 (LEFT/REMOVED 제외)
-  const totalParticipated = groups.filter(g => g.joined && !g.isRemoved && !g.isLeft).length;
+
+  // 프로필 벤토용 통계
+  const currentStreak = profile?.streak_count ?? 0;
+  const uniqueDaysLast30 = new Set(
+    completedVerifications
+      .filter(v => Date.now() - new Date(v.verified_at).getTime() < 30 * 86400000)
+      .map(v => v.verified_at.slice(0, 10))
+  ).size;
+  const last30Rate = Math.round((uniqueDaysLast30 / 30) * 100);
+  const xpAnim = useCountUp(totalDone, 900, 100);
+  const streakAnim = useCountUp(currentStreak, 900, 200);
+  const rateAnim = useCountUp(last30Rate, 900, 300);
 
   const MONTH_NAMES = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
   const calMonth = `${calYear}년 ${MONTH_NAMES[calMonthIndex]}`;
@@ -314,88 +323,56 @@ export function Stats() {
           )}
         </div>
 
-        {/* 나의 챌린지 */}
-        <div
-          onClick={() => navigate("/stats/challenge-history")}
-          className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.05] shadow-[0_2px_14px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-transform duration-150 cursor-pointer"
-          style={{ animation: "st-fade 0.45s ease 80ms both" }}
-        >
+        {/* 프로필 벤토 — 총 달성 / 연속 / 성공률 */}
+        <div className="grid grid-cols-2 gap-3" style={slide(140)}>
+          {/* 달성 (큰 타일, row-span-2) */}
           <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-            style={{ background: "linear-gradient(135deg,#FF3355,#ff5570)", boxShadow: "0 4px 14px rgba(255,51,85,0.3)" }}
+            className="row-span-2 bg-white rounded-2xl border border-black/[0.04] p-5 flex flex-col justify-between min-h-[180px]"
+            style={{ boxShadow: CARD_SHADOW }}
           >
-            <Trophy className="w-6 h-6 text-white" strokeWidth={2.2} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[14px] font-black text-slate-900">나의 챌린지</p>
-            <p className="text-[12px] text-slate-400 mt-0.5">
-              {totalParticipated > 0 ? `총 ${totalParticipated}개 참여 · 이전 기록 보기` : "아직 참여한 챌린지가 없어요"}
-            </p>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-[#FFE8EC] flex items-center justify-center shrink-0">
-            <ChevronRight className="w-4 h-4 text-[#FF3355]" />
-          </div>
-        </div>
-
-        {/* 인증 히스토리 */}
-        <div
-          onClick={() => navigate("/gallery")}
-          className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.05] shadow-[0_2px_14px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-transform duration-150 cursor-pointer"
-          style={{ animation: "st-fade 0.45s ease 100ms both" }}
-        >
-          <div className="shrink-0">
-            {recentPhotoThumbs.length > 0 ? (
-              <div className="flex -space-x-2">
-                {recentPhotoThumbs.map(thumb => (
-                  <button
-                    key={thumb.id}
-                    onClick={e => { e.stopPropagation(); navigate("/gallery", { state: { openId: thumb.id } }); }}
-                    className="rounded-xl overflow-hidden border-2 border-white shrink-0 active:scale-90 transition-transform"
-                  >
-                    <img src={thumb.src} alt="최근 인증" className="w-10 h-10 object-cover" referrerPolicy="no-referrer" />
-                  </button>
-                ))}
+            <div>
+              <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center mb-3.5">
+                <Trophy className="w-5 h-5 text-amber-500" strokeWidth={2.4} />
               </div>
-            ) : (
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center">
-                <ImageIcon className="w-5 h-5 text-slate-400" />
-              </div>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <ImageIcon className="w-3.5 h-3.5 text-[#FF3355]" />
-              <p className="text-[14px] font-black text-slate-900">인증 히스토리</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.14em]">총 인증</p>
             </div>
-            <p className="text-[12px] text-slate-400">
-              {photoCount > 0 ? `총 ${photoCount}장 · 갤러리에서 확인` : "아직 저장된 인증 사진이 없어요"}
-            </p>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-[#FFE8EC] flex items-center justify-center shrink-0">
-            <ChevronRight className="w-4 h-4 text-[#FF3355]" />
-          </div>
-        </div>
-
-        {/* 달성률 + 연속 */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-3xl p-4 flex flex-col items-center justify-center bg-white border border-black/[0.04] shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
-            style={{ minHeight: 150, animation: "st-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) 200ms both" }}>
-            <div className="relative">
-              <Ring pct={successRate / 100} size={90} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-[20px] font-black text-slate-900">{successRate}%</span>
-              </div>
+            <div>
+              <p className="text-[36px] font-black text-slate-900 leading-none tabular-nums">
+                {xpAnim}<span className="text-[15px] text-slate-400 ml-1 font-bold">회</span>
+              </p>
+              <p className="text-[11px] text-slate-400 mt-2 font-medium">전체 인증</p>
             </div>
-            <p className="text-[11px] text-slate-400 mt-2 font-semibold">이번 달 달성률</p>
           </div>
-          <div className="rounded-3xl p-5 relative overflow-hidden bg-white border border-black/[0.04] shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
-            style={{ minHeight: 150, animation: "st-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) 280ms both" }}>
-            <div className="relative z-10 h-full flex flex-col justify-between">
-              <Flame className="w-7 h-7" style={{ color: "#FF3355", fill: "#FF6680" }} />
-              <div>
-                <p className="text-[42px] font-black text-slate-900 leading-none">{maxStreak}</p>
-                <p className="text-[12px] text-slate-400 mt-1">일 연속</p>
-              </div>
+
+          {/* 연속 */}
+          <div
+            className="bg-white rounded-2xl border border-black/[0.04] p-4 flex items-center gap-3"
+            style={{ boxShadow: CARD_SHADOW }}
+          >
+            <div className="w-11 h-11 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
+              <Flame className="w-5 h-5 text-orange-500" strokeWidth={2.4} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.14em] mb-1">연속</p>
+              <p className="text-[22px] font-black text-slate-900 leading-none tabular-nums">
+                {streakAnim}<span className="text-[12px] text-slate-400 ml-1 font-bold">일</span>
+              </p>
+            </div>
+          </div>
+
+          {/* 성공률 */}
+          <div
+            className="bg-white rounded-2xl border border-black/[0.04] p-4 flex items-center gap-3"
+            style={{ boxShadow: CARD_SHADOW }}
+          >
+            <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-5 h-5 text-emerald-500" strokeWidth={2.4} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.14em] mb-1">성공률</p>
+              <p className="text-[22px] font-black text-slate-900 leading-none tabular-nums">
+                {rateAnim}<span className="text-[12px] text-slate-400 ml-1 font-bold">%</span>
+              </p>
             </div>
           </div>
         </div>
@@ -404,7 +381,7 @@ export function Stats() {
         <div className="rounded-2xl px-4 py-3.5 flex items-center gap-3 bg-[#FFF5F7] border border-[#FFD6DC]"
           style={{ animation: "st-fade 0.45s ease 320ms both" }}>
           <div className="w-8 h-8 rounded-xl bg-[#FFE8EC] flex items-center justify-center shrink-0">
-            <TrendingUp className="w-4 h-4 text-[#FF3355]" />
+            <Sparkles className="w-4 h-4 text-[#FF3355]" />
           </div>
           <p className="text-[13px] text-slate-600 leading-relaxed">
             {bestBar
@@ -413,19 +390,24 @@ export function Stats() {
           </p>
         </div>
 
-        {/* 미니 통계 3칸 */}
-        <div className="grid grid-cols-3 gap-2.5" style={{ animation: "st-fade 0.45s ease 380ms both" }}>
+        {/* 미니 통계 — 벤토 스타일 */}
+        <div className="grid grid-cols-2 gap-3" style={{ animation: "st-fade 0.45s ease 380ms both" }}>
           {[
-            { icon: Trophy,       label: "최고 연속", value: `${maxStreak}일`,    color: "#FF3355", bg: "bg-[#FFE8EC]" },
-            { icon: CheckCircle2, label: "총 인증",   value: `${totalDone}회`,   color: "#FF3355", bg: "bg-[#FFE8EC]" },
-            { icon: Flame,        label: "참여 챌린지", value: `${joinedCount}개`, color: "#FF3355", bg: "bg-[#FFE8EC]" },
-          ].map(({ icon: Icon, label, value, color, bg }) => (
-            <div key={label} className="rounded-2xl p-3 text-center bg-white border border-black/[0.04]">
-              <div className={`w-7 h-7 rounded-lg ${bg} flex items-center justify-center mx-auto mb-2`}>
-                <Icon className="w-3.5 h-3.5" style={{ color }} />
+            { Icon: Users, label: "참여 챌린지", value: joinedCount, suffix: "개", iconBg: "bg-violet-50", iconColor: "text-violet-500" },
+            { Icon: Award, label: "최고 연속",   value: maxStreak,   suffix: "일", iconBg: "bg-rose-50",   iconColor: "text-rose-500" },
+          ].map(({ Icon, label, value, suffix, iconBg, iconColor }) => (
+            <div key={label}
+              className="bg-white rounded-2xl border border-black/[0.04] p-4 flex flex-col gap-2.5"
+              style={{ boxShadow: CARD_SHADOW }}>
+              <div className={`w-9 h-9 rounded-xl ${iconBg} flex items-center justify-center`}>
+                <Icon className={`w-4 h-4 ${iconColor}`} strokeWidth={2.4} />
               </div>
-              <p className="text-[13px] font-black text-slate-900">{value}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">{label}</p>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.14em] mb-1">{label}</p>
+                <p className="text-[18px] font-black text-slate-900 leading-none tabular-nums">
+                  {value}<span className="text-[11px] text-slate-400 ml-1 font-bold">{suffix}</span>
+                </p>
+              </div>
             </div>
           ))}
         </div>
@@ -484,6 +466,26 @@ export function Stats() {
               <p className="text-[22px] font-black text-slate-300 leading-none">{remainingDays}</p>
               <p className="text-[10px] text-slate-400 mt-0.5">남은 날</p>
             </div>
+          </div>
+        </div>
+
+        {/* 달성률 + 연속 */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-3xl p-4 flex flex-col items-center justify-center bg-white border border-black/[0.04] shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
+            style={{ minHeight: 150, animation: "st-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) 200ms both" }}>
+            <div className="relative">
+              <Ring pct={successRate / 100} size={90} />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[20px] font-black text-slate-900">{successRate}%</span>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-2 font-semibold">이번 달 달성률</p>
+          </div>
+          <div className="rounded-3xl p-5 relative overflow-hidden bg-white border border-black/[0.04] shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center"
+            style={{ minHeight: 150, animation: "st-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) 280ms both" }}>
+            <Zap className="w-7 h-7 mb-2" style={{ color: "#FF3355", fill: "#FF6680" }} />
+            <p className="text-[36px] font-black text-slate-900 leading-none tabular-nums">{maxStreak}</p>
+            <p className="text-[11px] text-slate-400 mt-2 font-semibold">일 연속</p>
           </div>
         </div>
 
