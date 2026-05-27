@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Users, Calendar, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, Calendar, CheckCircle2, Trophy } from "lucide-react";
 import { useApp } from "../contexts/AppContext";
 import { cn } from "../lib/utils";
 import { useScrollRestoration, isReturningVisit } from "../lib/useScrollRestoration";
@@ -67,7 +67,9 @@ export function ChallengeHistory() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 pb-8">
         {participated.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 py-20">
-            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-2xl">🏆</div>
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
+              <Trophy className="w-7 h-7 text-slate-400" strokeWidth={2} />
+            </div>
             <p className="text-slate-500 font-bold text-[15px]">참여한 챌린지가 없어요</p>
             <p className="text-slate-400 text-[13px] text-center leading-relaxed">챌린지 탭에서 그룹에 참여해보세요</p>
           </div>

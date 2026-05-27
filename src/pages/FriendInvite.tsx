@@ -252,7 +252,6 @@ export function FriendInvite() {
           className="mx-4 mt-4 rounded-2xl overflow-hidden relative"
           style={{
             background: "linear-gradient(115deg, #FF3355 0%, #C8002B 100%)",
-            boxShadow: "0 6px 20px rgba(255,51,85,0.25)",
             opacity: mounted ? 1 : 0,
             transform: mounted ? "translateY(0)" : "translateY(16px)",
             transition: "all 0.5s cubic-bezier(0.34,1.56,0.64,1) 60ms",

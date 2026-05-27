@@ -139,7 +139,6 @@ supabase secrets set GEMINI_API_KEY=<key>
 | `/notifications` | 알림 목록 |
 | `/settings/notifications` | 알림 설정 |
 | `/profile/edit` | 프로필 편집 |
-| `/stats/weekly-report` | 주간 리포트 |
 | `/stats/challenge-history` | 챌린지 이력 |
 | `/friends/invite` | 친구 초대 |
 | `/user/:seed` | 공개 유저 프로필 |

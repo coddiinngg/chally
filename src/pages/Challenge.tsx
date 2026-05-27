@@ -1,5 +1,6 @@
 import { Search, Users, ChevronDown,
-         Activity, BookOpen, Apple, Sparkles, Trophy, Bell, BellRing } from "lucide-react";
+         Activity, BookOpen, Apple, Sparkles, Trophy, Bell, BellRing,
+         Check, DoorOpen, Hand } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
@@ -43,11 +44,11 @@ function LiveTicker({ items }: { items: Group[] }) {
   if (items.length === 0) return null;
 
   function Chip({ g }: { g: Group; key?: React.Key }) {
-    const emoji = VERIFY_TYPES[(g.verifyType as VerifyTypeKey)]?.emoji ?? "🏃";
+    const VtIcon = VERIFY_TYPES[(g.verifyType as VerifyTypeKey)]?.Icon ?? Activity;
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full shrink-0"
         style={{ background: "rgba(255,51,85,0.06)", border: "1px solid rgba(255,51,85,0.13)" }}>
-        <span className="text-[10px] leading-none">{emoji}</span>
+        <VtIcon className="w-3 h-3" style={{ color: "#FF3355" }} strokeWidth={2.2} />
         <span className="text-[10px] font-semibold text-slate-500 leading-none whitespace-nowrap">{g.title}</span>
       </span>
     );
@@ -223,7 +224,7 @@ export function Challenge() {
             animation: "ch-toast 0.3s cubic-bezier(0.34,1.56,0.64,1) both",
           }}
         >
-          <span className="text-[18px] leading-none shrink-0">🚪</span>
+          <DoorOpen className="w-[18px] h-[18px] text-white shrink-0" strokeWidth={2.2} />
           <div>
             <p className="text-white font-black text-[13px] leading-tight">그룹에서 퇴장됐어요</p>
             <p className="text-white/75 text-[11px] mt-0.5">72시간 미인증으로 인해 자동 퇴장 처리됐어요.</p>
@@ -325,7 +326,7 @@ export function Challenge() {
         <div className="px-4 pt-3 pb-1" style={slide(60)}>
           <div
             className="relative overflow-hidden rounded-2xl px-4 py-3 flex items-center justify-between"
-            style={{ background: "linear-gradient(115deg, #FF3355 0%, #C8002B 100%)", boxShadow: "0 6px 20px rgba(255,51,85,0.25)" }}
+            style={{ background: "linear-gradient(115deg, #FF3355 0%, #C8002B 100%)" }}
           >
             <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-20"
               style={{ background: "radial-gradient(circle, #fff 0%, transparent 70%)" }} />
@@ -470,20 +471,23 @@ export function Challenge() {
 
                   /* 참여했던 그룹 + 종료됨 + 결과 확인 완료 → 확인 완료 (disabled) */
                   ) : isJoined && isEnded && isConfirmed ? (
-                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold text-slate-300 bg-slate-50 text-center border border-slate-100">
-                      ✓ 결과 확인 완료
+                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold text-slate-300 bg-slate-50 text-center border border-slate-100 flex items-center justify-center gap-1.5">
+                      <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+                      결과 확인 완료
                     </div>
 
                   /* 강퇴됨 */
                   ) : g.isRemoved ? (
-                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-400 text-center">
-                      🚪 퇴장됨 · 조회만 가능
+                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-400 text-center flex items-center justify-center gap-1.5">
+                      <DoorOpen className="w-3.5 h-3.5" strokeWidth={2.2} />
+                      퇴장됨 · 조회만 가능
                     </div>
 
                   /* 탈퇴됨 (영구 — 재참여 불가) */
                   ) : g.isLeft ? (
-                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-400 text-center">
-                      👋 탈퇴됨 · 조회만 가능
+                    <div className="w-full py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-400 text-center flex items-center justify-center gap-1.5">
+                      <Hand className="w-3.5 h-3.5" strokeWidth={2.2} />
+                      탈퇴됨 · 조회만 가능
                     </div>
 
                   /* 참여 가능 → 참여하기 */

@@ -1,3 +1,6 @@
+import type { LucideIcon } from "lucide-react";
+import { Footprints, Activity, PenLine, BookOpen, Camera, MapPin } from "lucide-react";
+
 export type VerifyTypeKey =
   | "step_walk"
   | "run_scenery"
@@ -9,6 +12,7 @@ export type VerifyTypeKey =
 export interface VerifyTypeData {
   label: string;
   emoji: string;
+  Icon: LucideIcon;
   desc: string;
   guide: string[];
   tip: string;
@@ -28,6 +32,7 @@ export const VERIFY_TYPES: Record<VerifyTypeKey, VerifyTypeData> = {
   step_walk: {
     label: "걷기 인증",
     emoji: "👟",
+    Icon: Footprints,
     desc: "만보기 화면을 캡처해서 인증해요",
     guide: [
       "걸음 수가 보이는 만보기 앱 화면을 켜주세요",
@@ -56,6 +61,7 @@ export const VERIFY_TYPES: Record<VerifyTypeKey, VerifyTypeData> = {
   run_scenery: {
     label: "러닝 풍경",
     emoji: "🏃",
+    Icon: Activity,
     desc: "러닝하면서 찍은 최애 풍경을 공유해요",
     guide: [
       "러닝 중 또는 완료 직후에 촬영해야 해요",
@@ -84,6 +90,7 @@ export const VERIFY_TYPES: Record<VerifyTypeKey, VerifyTypeData> = {
   quote_photo: {
     label: "인상 문장",
     emoji: "✍️",
+    Icon: PenLine,
     desc: "오늘 곱씹게 되는 문장을 사진으로 남겨요",
     guide: [
       "책·신문·노트 등 어떤 글이든 OK",
@@ -112,6 +119,7 @@ export const VERIFY_TYPES: Record<VerifyTypeKey, VerifyTypeData> = {
   book_cover: {
     label: "책 표지",
     emoji: "📚",
+    Icon: BookOpen,
     desc: "지금 읽고 있는 책 표지를 찍어요",
     guide: [
       "표지에 제목과 저자명이 보여야 해요",
@@ -140,6 +148,7 @@ export const VERIFY_TYPES: Record<VerifyTypeKey, VerifyTypeData> = {
   celeb_pose: {
     label: "포즈 인증",
     emoji: "📸",
+    Icon: Camera,
     desc: "오늘의 지정 포즈로 사진을 찍어요",
     guide: [
       "오늘의 지정 포즈를 따라해요 (가이드 이미지 참고)",
@@ -168,6 +177,7 @@ export const VERIFY_TYPES: Record<VerifyTypeKey, VerifyTypeData> = {
   location_photo: {
     label: "장소 인증",
     emoji: "📍",
+    Icon: MapPin,
     desc: "목표한 장소에서 사진을 찍어요",
     guide: [
       "지정 장소 또는 목표 장소에서 찍어요",

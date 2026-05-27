@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { TrendingUp, Flame, Calendar, Trophy, CheckCircle2, ChevronRight, ImageIcon, ChevronLeft } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useScrollRestoration, isReturningVisit, usePersistedNumber } from "../lib/useScrollRestoration";
 
@@ -176,7 +176,6 @@ export function Stats() {
   const weeklyDiff = weeklyTotalDone - previousWeeklyTotalDone;
   const bars = weeklyCounts.map((count, idx) => ({
     day: ["월", "화", "수", "목", "금", "토", "일"][idx],
-    v: maxWeeklyCount > 0 ? Math.max(12, Math.round((count / maxWeeklyCount) * 100)) : 0,
     hi: count === maxWeeklyCount && count > 0,
     count,
   }));
@@ -288,17 +287,20 @@ export function Stats() {
           </div>
           {weeklyTotalDone > 0 ? (
             <div className="flex items-end gap-1.5" style={{ height: 100 }}>
-              {bars.map(({ day, v, hi, count }, idx) => (
+              {bars.map(({ day, hi, count }, idx) => (
                 <div key={day} className="flex flex-col items-center gap-2 flex-1">
-                  <div className="w-full relative rounded-lg overflow-hidden bg-slate-100" style={{ height: 80 }}>
-                    <div className="absolute bottom-0 left-0 right-0 rounded-t"
-                      style={{
-                        height: mounted ? `${v}%` : "0%",
-                        transition: "height 0.7s cubic-bezier(0.4,0,0.2,1)",
-                        transitionDelay: `${idx * 60 + 100}ms`,
-                        background: hi ? "linear-gradient(180deg, #FF6680 0%, #FF3355 100%)" : "rgba(255,51,85,0.15)",
-                        boxShadow: hi ? "0 0 16px rgba(255,51,85,0.35)" : "none",
-                      }} />
+                  <div className="w-full relative rounded-lg overflow-hidden bg-slate-100 flex flex-col-reverse gap-[3px] p-1.5" style={{ height: 80 }}>
+                    {Array.from({ length: count }).map((_, i) => (
+                      <div key={i} className="w-full rounded-[3px] shrink-0"
+                        style={{
+                          height: 7,
+                          background: hi ? "linear-gradient(90deg, #FF6680 0%, #FF3355 100%)" : "rgba(255,51,85,0.45)",
+                          opacity: mounted ? 1 : 0,
+                          transform: mounted ? "translateY(0)" : "translateY(6px)",
+                          transition: "opacity 0.35s ease, transform 0.35s cubic-bezier(0.4,0,0.2,1)",
+                          transitionDelay: `${idx * 50 + i * 70 + 100}ms`,
+                        }} />
+                    ))}
                   </div>
                   <span className="text-[9px] text-slate-300 leading-none">{count > 0 ? `${count}회` : "\u00A0"}</span>
                   <span className={`text-[10px] font-bold ${hi ? "text-[#FF3355]" : "text-slate-400"}`}>{day}</span>
@@ -319,10 +321,10 @@ export function Stats() {
           style={{ animation: "st-fade 0.45s ease 80ms both" }}
         >
           <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-[22px]"
+            className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
             style={{ background: "linear-gradient(135deg,#FF3355,#ff5570)", boxShadow: "0 4px 14px rgba(255,51,85,0.3)" }}
           >
-            🏆
+            <Trophy className="w-6 h-6 text-white" strokeWidth={2.2} />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[14px] font-black text-slate-900">나의 챌린지</p>
@@ -484,27 +486,6 @@ export function Stats() {
             </div>
           </div>
         </div>
-
-        {/* 주간 리포트 */}
-        <Link
-          to="/stats/weekly-report"
-          className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.05] shadow-[0_2px_14px_rgba(0,0,0,0.06)] active:scale-[0.98] transition-transform duration-150"
-          style={slide(500)}
-        >
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-            style={{ background: "linear-gradient(135deg, #FF3355, #ff5570)", boxShadow: "0 4px 14px rgba(255,51,85,0.3)" }}
-          >
-            <TrendingUp className="w-5 h-5 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[14px] font-black text-slate-900">주간 리포트</p>
-            <p className="text-[12px] text-slate-400 mt-0.5">이번 주 챌린지별 인증 분석 보기</p>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-[#FFE8EC] flex items-center justify-center shrink-0">
-            <ChevronRight className="w-4 h-4 text-[#FF3355]" />
-          </div>
-        </Link>
 
         <div className="h-4" />
       </div>

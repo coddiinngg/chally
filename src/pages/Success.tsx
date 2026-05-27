@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Share2, ArrowRight, Loader2 } from "lucide-react";
+import { Share2, ArrowRight, Loader2, X, Sparkles, PartyPopper, Flame } from "lucide-react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -222,9 +222,9 @@ export function Success() {
       {/* 닫기 */}
       <button
         onClick={() => navigate("/")}
-        className="absolute top-12 left-4 z-20 w-10 h-10 rounded-full bg-black/10 flex items-center justify-center text-slate-500 active:scale-90 transition-all text-lg"
+        className="absolute top-12 left-4 z-20 w-10 h-10 rounded-full bg-black/10 flex items-center justify-center text-slate-500 active:scale-90 transition-all"
       >
-        ✕
+        <X className="w-5 h-5" />
       </button>
 
       <div className="flex-1 overflow-y-auto pt-14 pb-4 px-6 relative z-10 flex flex-col items-center">
@@ -241,17 +241,21 @@ export function Success() {
               }}
             />
             <div
-              className="w-24 h-24 rounded-full flex items-center justify-center text-[44px] relative z-10"
+              className="w-24 h-24 rounded-full flex items-center justify-center relative z-10"
               style={{
                 background: "linear-gradient(135deg,#FF3355,#FF6680)",
                 boxShadow: "0 16px 40px -8px rgba(255,51,85,0.4)",
                 animation: mounted ? "suc-bounce 0.6s cubic-bezier(0.34,1.56,0.64,1) 80ms both" : "none",
               }}
             >
-              {vt.emoji}
+              <vt.Icon className="w-11 h-11 text-white" strokeWidth={2.2} />
             </div>
-            <div className="absolute -top-1 -right-1 text-xl" style={{ animation: mounted ? "suc-bounce 0.5s ease 350ms both" : "none" }}>🎉</div>
-            <div className="absolute -bottom-1 -left-1 text-lg" style={{ animation: mounted ? "suc-bounce 0.5s ease 450ms both" : "none" }}>✨</div>
+            <div className="absolute -top-1 -right-1" style={{ animation: mounted ? "suc-bounce 0.5s ease 350ms both" : "none" }}>
+              <PartyPopper className="w-5 h-5 text-amber-400" strokeWidth={2.4} />
+            </div>
+            <div className="absolute -bottom-1 -left-1" style={{ animation: mounted ? "suc-bounce 0.5s ease 450ms both" : "none" }}>
+              <Sparkles className="w-4 h-4 text-amber-300" strokeWidth={2.4} />
+            </div>
           </div>
         </div>
 
@@ -266,7 +270,7 @@ export function Success() {
               boxShadow: "0 4px 12px -4px rgba(255,51,85,0.2)",
             }}
           >
-            <span className="text-[14px] leading-none">🔥</span>
+            <Flame className="w-3.5 h-3.5" style={{ color: "#FF3355" }} fill="#FF3355" strokeWidth={2} />
             <span className="text-[12px] font-black tabular-nums" style={{ color: "#FF3355" }}>
               {streakCount}일 연속 인증
             </span>
@@ -275,8 +279,9 @@ export function Success() {
 
         {/* ── 헤드라인 ── */}
         <div className="text-center mb-5" style={slide(220)}>
-          <h1 className="suc-headline-grad text-[34px] font-black leading-tight mb-1.5 tracking-tight">
-            인증 완료! 🔥
+          <h1 className="suc-headline-grad text-[34px] font-black leading-tight mb-1.5 tracking-tight inline-flex items-center justify-center gap-2">
+            인증 완료!
+            <Flame className="w-7 h-7 text-[#FF3355]" fill="#FF3355" strokeWidth={2} />
           </h1>
           <p className="text-slate-500 text-[14px] leading-relaxed">
             <span className="font-bold text-slate-700">"{capturedGroup?.title ?? vt.label}"</span> 챌린지 달성!<br />
@@ -290,7 +295,6 @@ export function Success() {
             <button
               className="relative rounded-2xl overflow-hidden w-full active:scale-[0.98] transition-transform block"
               style={{
-                boxShadow: "0 24px 48px -16px rgba(255,51,85,0.32), 0 8px 16px -8px rgba(255,51,85,0.18)",
                 border: "1px solid rgba(255,51,85,0.12)",
               }}
               onClick={() => setShowShareCard(true)}
@@ -305,7 +309,7 @@ export function Success() {
                 className="absolute bottom-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full"
                 style={{ background: "linear-gradient(135deg,#FF3355,#FF6680)", boxShadow: "0 4px 12px rgba(255,51,85,0.4)" }}
               >
-                <span className="text-[13px]">{vt.emoji}</span>
+                <vt.Icon className="w-3.5 h-3.5 text-white" strokeWidth={2.4} />
                 <span className="text-white font-bold text-[12px]">{vt.label} 인증</span>
               </div>
               {/* 탭 힌트 */}

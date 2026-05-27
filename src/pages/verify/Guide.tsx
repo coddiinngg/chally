@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Camera, CheckCircle2 } from "lucide-react";
+import { X, Camera, CheckCircle2, Lightbulb } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../../lib/verifyTypes";
@@ -70,10 +70,10 @@ export function VerifyGuide() {
             style={{ background: `radial-gradient(circle, rgba(255,102,128,${d ? 0.1 : 0.06}) 0%, transparent 70%)` }} />
 
           <div className="relative px-6 pt-7 pb-6">
-            {/* 이모지 */}
+            {/* 아이콘 */}
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5"
               style={{ background: d ? "rgba(255,51,85,0.12)" : "#FFF0F3" }}>
-              <span className="text-[44px] leading-none">{vt.emoji}</span>
+              <vt.Icon className="w-11 h-11" style={{ color: "#FF3355" }} strokeWidth={2} />
             </div>
 
             {/* 라벨 */}
@@ -152,7 +152,7 @@ export function VerifyGuide() {
           style={{ ...fade(270), background: cardBg, boxShadow: shadow }}>
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
             style={{ background: d ? "rgba(251,191,36,0.12)" : "#FFFBEB" }}>
-            <span className="text-[16px] leading-none">💡</span>
+            <Lightbulb className="w-4 h-4 text-amber-500" strokeWidth={2.2} />
           </div>
           <p className="text-[12px] leading-relaxed flex-1 pt-1" style={{ color: textSec }}>{vt.tip}</p>
         </div>

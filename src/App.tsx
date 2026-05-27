@@ -25,7 +25,6 @@ const ChallengeResult = lazy(() => import("./pages/challenge/ChallengeResult").t
 const Gallery = lazy(() => import("./pages/Gallery").then(module => ({ default: module.Gallery })));
 const Rewards = lazy(() => import("./pages/Rewards").then(module => ({ default: module.Rewards })));
 const Notifications = lazy(() => import("./pages/Notifications").then(module => ({ default: module.Notifications })));
-const WeeklyReport = lazy(() => import("./pages/WeeklyReport").then(module => ({ default: module.WeeklyReport })));
 const FriendInvite = lazy(() => import("./pages/FriendInvite").then(module => ({ default: module.FriendInvite })));
 const UserProfile = lazy(() => import("./pages/UserProfile").then(module => ({ default: module.UserProfile })));
 const FeedAll = lazy(() => import("./pages/FeedAll").then(module => ({ default: module.FeedAll })));
@@ -126,7 +125,6 @@ export default function App() {
                 <Route path="/gallery" element={<Gallery />} />
                 <Route path="/rewards" element={<Rewards />} />
                 <Route path="/notifications" element={<Notifications />} />
-                <Route path="/stats/weekly-report" element={<WeeklyReport />} />
                 <Route path="/stats/challenge-history" element={<ChallengeHistory />} />
                 <Route path="/friends/invite" element={<FriendInvite />} />
                 <Route path="/challenge/group/:groupId" element={<GroupDetail />} />

@@ -246,7 +246,6 @@ export function Profile() {
             style={{
               ...slide(180),
               background: "linear-gradient(115deg, #FF3355 0%, #C8002B 100%)",
-              boxShadow: "0 6px 20px rgba(255,51,85,0.25)",
             }}
           >
             <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-20 pointer-events-none"

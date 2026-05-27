@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react";
-import { Bell, BellRing, Camera, Flame, Send, Crown, ChevronRight, Zap, Lightbulb, SmilePlus, Trophy, ArrowRight, X, ChevronLeft } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Bell, BellRing, Camera, Flame, Send, Crown, ChevronRight, Zap, Lightbulb, SmilePlus, Trophy, ArrowRight, ChevronLeft, Dumbbell, Satellite, Activity, MessageCircle, Hourglass, Flag, PartyPopper } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -60,7 +61,7 @@ interface FeedItem {
   time: string;
   caption: string;
   groupTitle: string;
-  verifyEmoji: string;
+  verifyIcon: LucideIcon;
   img: string;
   aspect: "tall" | "square";
   reactionCount?: number;
@@ -399,7 +400,7 @@ export function Home() {
       time: formatActivityTime(post.created_at),
       caption: post.message,
       groupTitle: vt.label,
-      verifyEmoji: vt.emoji,
+      verifyIcon: vt.Icon,
       img: post.photo_url ?? "",
       aspect: index % 3 === 0 ? "tall" : "square",
       reactionCount: post.reactionCount,
@@ -708,8 +709,9 @@ export function Home() {
                       animation: "ee-ribbon-shimmer 2.4s linear infinite",
                       boxShadow: "0 4px 16px rgba(255,80,40,0.5)",
                     }}>
-                    <span className="text-[18px] leading-none"
-                      style={{ animation: "ee-flame-rise 1.2s ease-in-out infinite", display: "inline-block" }}>🔥</span>
+                    <span style={{ animation: "ee-flame-rise 1.2s ease-in-out infinite", display: "inline-block" }}>
+                      <Flame className="w-[18px] h-[18px] text-white" fill="rgba(255,200,80,0.8)" strokeWidth={2} />
+                    </span>
                     <div className="flex-1">
                       <p className="text-white font-black text-[12px] leading-tight">48시간 미인증 경고</p>
                       <p className="text-white/85 text-[10px] leading-tight">지금 인증하지 않으면 자동 퇴장돼요</p>
@@ -717,14 +719,14 @@ export function Home() {
                   </div>
                 </div>
                 {/* 하단 좌측 큰 불꽃 */}
-                <span className="absolute bottom-4 left-4 z-30 text-[44px] leading-none pointer-events-none"
+                <span className="absolute bottom-4 left-4 z-30 pointer-events-none"
                   style={{ animation: "ee-flame-rise 1.1s ease-in-out infinite", filter: "drop-shadow(0 0 12px rgba(255,140,40,0.8))" }}>
-                  🔥
+                  <Flame className="w-11 h-11 text-orange-500" fill="rgba(255,140,40,0.85)" strokeWidth={1.8} />
                 </span>
                 {/* 하단 우측 작은 불꽃 */}
-                <span className="absolute bottom-6 right-6 z-30 text-[28px] leading-none pointer-events-none"
+                <span className="absolute bottom-6 right-6 z-30 pointer-events-none"
                   style={{ animation: "ee-flame-rise 1.4s ease-in-out infinite", animationDelay: "0.3s", filter: "drop-shadow(0 0 10px rgba(255,80,40,0.7))" }}>
-                  🔥
+                  <Flame className="w-7 h-7 text-orange-500" fill="rgba(255,140,40,0.85)" strokeWidth={1.8} />
                 </span>
               </>
             )}
@@ -745,13 +747,13 @@ export function Home() {
                 </div>
               ) : groupsLoadError ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-50 px-8 text-center">
-                  <span className="text-4xl">📡</span>
+                  <Satellite className="w-10 h-10 text-slate-400" strokeWidth={1.8} />
                   <p className="text-slate-700 font-black text-[16px]">그룹 정보를 불러오지 못했어요</p>
                   <p className="text-slate-400 text-[13px]">네트워크 연결을 확인하고 다시 시도해주세요</p>
                 </div>
               ) : myGroups.length === 0 ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-50">
-                  <span className="text-4xl">🏃</span>
+                  <Activity className="w-10 h-10 text-slate-400" strokeWidth={2} />
                   <p className="text-slate-700 font-black text-[16px]">참여 중인 그룹이 없어요</p>
                   <p className="text-slate-400 text-[13px]">챌린지 탭에서 그룹에 참여해보세요</p>
                   <button onClick={() => navigate("/challenge")}
@@ -788,8 +790,11 @@ export function Home() {
 
                 {/* 중앙 달성률 */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                  <span className="text-[68px] leading-none">
-                    {(selectedGroup?.crewRate ?? 0) >= 50 ? "🏆" : "💪"}
+                  <span className="flex items-center justify-center" style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.45))" }}>
+                    {(selectedGroup?.crewRate ?? 0) >= 50
+                      ? <Trophy className="w-16 h-16 text-amber-300" strokeWidth={1.8} />
+                      : <Dumbbell className="w-16 h-16 text-white" strokeWidth={1.8} />
+                    }
                   </span>
                   <div className="flex items-baseline gap-0.5">
                     <span className="text-white font-black text-[72px] leading-none tabular-nums italic"
@@ -798,8 +803,11 @@ export function Home() {
                     </span>
                     <span className="text-white font-black text-[32px] italic opacity-80">%</span>
                   </div>
-                  <p className="text-white font-black text-[20px]">
-                    챌린지 {(selectedGroup?.crewRate ?? 0) >= 50 ? "달성 🎉" : "미달성 😢"}
+                  <p className="text-white font-black text-[20px] inline-flex items-center gap-1.5">
+                    챌린지 {(selectedGroup?.crewRate ?? 0) >= 50
+                      ? <>달성 <PartyPopper className="w-5 h-5 text-amber-300" strokeWidth={2.2} /></>
+                      : "미달성"
+                    }
                   </p>
                 </div>
 
@@ -1008,7 +1016,7 @@ export function Home() {
 
               {myGroups.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-2">
-                  <span className="text-4xl">🏆</span>
+                  <Trophy className="w-10 h-10 text-slate-300" strokeWidth={2} />
                   <p className="text-slate-700 font-black text-[15px]">순위 정보가 없어요</p>
                   <p className="text-slate-400 text-[12px]">그룹에 참여하면 순위를 확인할 수 있어요</p>
                 </div>
@@ -1022,7 +1030,7 @@ export function Home() {
 
               {rankers.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center">
-                  <span className="text-4xl">🏆</span>
+                  <Trophy className="w-10 h-10 text-slate-300" strokeWidth={2} />
                   <p className="text-slate-700 font-black text-[15px]">아직 순위가 없어요</p>
                   <p className="text-slate-400 text-[12px]">그룹 멤버가 인증하면 순위가 표시돼요</p>
                 </div>
@@ -1110,7 +1118,7 @@ export function Home() {
 
               {myGroups.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-2">
-                  <span className="text-4xl">💬</span>
+                  <MessageCircle className="w-10 h-10 text-slate-300" strokeWidth={2} />
                   <p className="text-slate-700 font-black text-[15px]">채팅이 없어요</p>
                   <p className="text-slate-400 text-[12px]">그룹에 참여하면 채팅할 수 있어요</p>
                 </div>
@@ -1139,7 +1147,7 @@ export function Home() {
                 onClick={() => emojiPickerFor && setEmojiPickerFor(null)}>
                 {chats.length === 0 && (
                   <div className="h-full min-h-[220px] flex flex-col items-center justify-center gap-2 text-center">
-                    <span className="text-4xl">💬</span>
+                    <MessageCircle className="w-10 h-10 text-slate-300" strokeWidth={2} />
                     <p className="text-slate-700 font-black text-[15px]">아직 메시지가 없어요</p>
                     <p className="text-slate-400 text-[12px]">첫 메시지를 남겨 그룹 대화를 시작해보세요</p>
                   </div>
@@ -1161,7 +1169,7 @@ export function Home() {
                             <div className="flex items-center gap-1.5 rounded-full px-3 py-1.5"
                               style={{ background: "linear-gradient(135deg,rgba(251,191,36,0.12),rgba(249,115,22,0.12))", border: "1px solid rgba(251,191,36,0.3)" }}>
                               <Flame className="w-3 h-3 text-amber-500 fill-amber-400 shrink-0" />
-                              <span className="text-amber-700 text-[11px] font-bold">{msg.achieverName} · {msg.streak}일 연속 달성! 🎉</span>
+                              <span className="text-amber-700 text-[11px] font-bold inline-flex items-center gap-1">{msg.achieverName} · {msg.streak}일 연속 달성! <PartyPopper className="w-3 h-3 text-amber-500" strokeWidth={2.4} /></span>
                             </div>
                           </div>
                         ) : (
@@ -1306,7 +1314,7 @@ export function Home() {
               style={{ background: "linear-gradient(115deg,#3B82F6,#6366F1)", boxShadow: "0 8px 24px rgba(99,102,241,0.22)" }}>
               <div className="shrink-0 w-10 h-10 rounded-[14px] flex items-center justify-center"
                 style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(4px)", border: "1px solid rgba(255,255,255,0.2)" }}>
-                <span className="text-[18px] leading-none">⏳</span>
+                <Hourglass className="w-[18px] h-[18px] text-white" strokeWidth={2} />
               </div>
               <div className="flex flex-col gap-0.5 flex-1">
                 <span className="text-white font-black text-[16px] leading-none tracking-tight">챌린지 시작을 기다리는 중이에요</span>
@@ -1327,7 +1335,7 @@ export function Home() {
               style={{ background: "linear-gradient(115deg,#64748B,#475569)", boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
               <div className="shrink-0 w-10 h-10 rounded-[14px] flex items-center justify-center"
                 style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(4px)", border: "1px solid rgba(255,255,255,0.2)" }}>
-                <span className="text-[18px] leading-none">🏁</span>
+                <Flag className="w-[18px] h-[18px] text-white" strokeWidth={2} />
               </div>
               <div className="flex flex-col gap-0.5 flex-1">
                 <span className="font-black text-[16px] leading-none tracking-tight">확인하기</span>
@@ -1363,23 +1371,34 @@ export function Home() {
               <div className="shrink-0 w-10 h-10 rounded-[14px] flex items-center justify-center relative"
                 style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(4px)", border: "1px solid rgba(255,255,255,0.2)" }}>
                 {isExitEligible ? (
-                  <span className="text-[20px] leading-none"
-                    style={{ animation: "ee-flame-rise 1.0s ease-in-out infinite", display: "inline-block" }}>🔥</span>
+                  <span style={{ animation: "ee-flame-rise 1.0s ease-in-out infinite", display: "inline-block" }}>
+                    <Flame className="w-5 h-5 text-white" fill="rgba(255,200,100,0.8)" strokeWidth={2} />
+                  </span>
                 ) : (
                   <Camera className="w-5 h-5 text-white" strokeWidth={2} />
                 )}
               </div>
-              <div className="flex flex-col gap-0.5 flex-1">
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                 <span className="font-black text-[16px] leading-none tracking-tight">
                   {isExitEligible ? "지금 인증하기!" : "오늘 인증하기"}
                 </span>
-                <span className="text-white/85 text-[12px] font-medium leading-none truncate">
-                  {isExitEligible
-                    ? "24시간 안에 인증하지 않으면 퇴장돼요"
-                    : selectedGroup
-                      ? `${VERIFY_TYPES[(selectedGroup.verifyType as VerifyTypeKey) ?? "step_walk"]?.emoji} ${selectedGroup.goal}`
-                      : "챌린지에 참여하고 인증해보세요"}
-                </span>
+                {isExitEligible ? (
+                  <span className="text-white/85 text-[12px] font-medium leading-none truncate">
+                    24시간 안에 인증하지 않으면 퇴장돼요
+                  </span>
+                ) : selectedGroup ? (
+                  (() => {
+                    const VtIcon = VERIFY_TYPES[(selectedGroup.verifyType as VerifyTypeKey) ?? "step_walk"]?.Icon ?? Activity;
+                    return (
+                      <span className="text-white/85 text-[12px] font-medium leading-none truncate inline-flex items-center gap-1">
+                        <VtIcon className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
+                        <span className="truncate">{selectedGroup.goal}</span>
+                      </span>
+                    );
+                  })()
+                ) : (
+                  <span className="text-white/85 text-[12px] font-medium leading-none truncate">챌린지에 참여하고 인증해보세요</span>
+                )}
               </div>
               <ChevronRight className="w-5 h-5 text-white/60 shrink-0" strokeWidth={2.5} />
             </button>
@@ -1469,8 +1488,8 @@ function FeedCard({ item, onTap }: { item: FeedItem; onTap: () => void; key?: Re
         <div className="w-full h-full bg-gradient-to-br from-[#FF3355] to-[#FF6680]" />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
-      <div className="absolute top-1.5 right-1.5 bg-black/30 backdrop-blur-sm px-1 py-0.5 rounded-full">
-        <span className="text-[9px]">{item.verifyEmoji}</span>
+      <div className="absolute top-1.5 right-1.5 bg-black/30 backdrop-blur-sm w-5 h-5 rounded-full flex items-center justify-center">
+        <item.verifyIcon className="w-3 h-3 text-white" strokeWidth={2.2} />
       </div>
       <div className="absolute bottom-0 left-0 right-0 px-2 pb-2">
         <img

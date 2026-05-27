@@ -133,12 +133,6 @@ export function Camera() {
       {/* 배경 — 타입 컬러 그라디언트 */}
       <div className="absolute inset-0" style={{ background: bgGrad }} />
 
-      {/* Chally 로고 워터마크 */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <img src="/chally-logo-nobg.png" alt=""
-          style={{ width: 200, opacity: logoOpacity, filter: logoFilter }} />
-      </div>
-
       {/* 상하 그라데이션 오버레이 */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: vignette }} />
 
@@ -173,6 +167,11 @@ export function Camera() {
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-4 px-10">
         <div className={`relative w-full max-w-[270px] ${frameRatio}`}
           style={{ animation: mounted ? "cam-bracket 0.5s cubic-bezier(0.22,1,0.36,1) 0.1s both" : "none" }}>
+
+          {/* Chally 로고 워터마크 — 프레임 중심 정렬 */}
+          <img src="/chally-logo-nobg.png" alt=""
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none"
+            style={{ width: 200, opacity: logoOpacity, filter: logoFilter }} />
 
           {/* 모서리 브래킷 */}
           {[

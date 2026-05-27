@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   Flame, CheckCircle2, ArrowRight,
-  Zap, User,
+  Zap, User, Users, Sunrise, Activity, Dumbbell, BookOpen, Library, Sprout, Palette, Sparkles, Target,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
@@ -120,7 +121,7 @@ function Slide1({ on }: { on: boolean }) {
               animation: on ? cardAnim(130, "ob-float-b") : "none",
             }}
           >
-            <span className="text-sm">👥</span>
+            <Users className="w-4 h-4 text-white" strokeWidth={2.2} />
             <div>
               <div className="text-white/60 text-[8px] font-semibold mb-0.5">지금 참여 중</div>
               <div className="text-white font-extrabold text-sm leading-none">38명</div>
@@ -139,7 +140,7 @@ function Slide1({ on }: { on: boolean }) {
             <Flame className="w-4 h-4 text-white fill-white/80" />
             <div>
               <div className="text-orange-100/60 text-[8px] font-semibold mb-0.5">연속 달성</div>
-              <div className="text-white font-extrabold text-sm leading-none">7일 🔥</div>
+              <div className="text-white font-extrabold text-sm leading-none">7일</div>
             </div>
           </div>
         </div>
@@ -308,7 +309,7 @@ function Slide3({ on }: { on: boolean }) {
               <img src="https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=400&fit=crop&q=80" alt="" className="absolute inset-0 w-full h-full object-cover" referrerPolicy="no-referrer" />
               <div className="absolute inset-0 bg-black/50" />
               <div className="absolute inset-0 flex items-center px-3 gap-2">
-                <span className="text-lg leading-none">🏃</span>
+                <Activity className="w-5 h-5 text-white" strokeWidth={2.2} />
                 <div>
                   <p className="text-white font-black text-[13px]">러닝 크루</p>
                   <p className="text-white/45 text-[9px] font-bold uppercase tracking-widest">이번 주 랭킹</p>
@@ -353,7 +354,7 @@ function Slide3({ on }: { on: boolean }) {
               animation: on ? cardAnim(180, "ob-float-b") : "none",
             }}
           >
-            <span className="text-sm">🌅</span>
+            <Sunrise className="w-4 h-4 text-white" strokeWidth={2.2} />
             <div>
               <div className="text-emerald-100/70 text-[8px] font-semibold mb-0.5">이번 주 최고</div>
               <div className="text-white font-extrabold text-sm leading-none">sm 96%</div>
@@ -372,7 +373,7 @@ function Slide3({ on }: { on: boolean }) {
             <Flame className="w-4 h-4 text-white fill-white/80" />
             <div>
               <div className="text-orange-100/60 text-[8px] font-semibold mb-0.5">연속 달성</div>
-              <div className="text-white font-extrabold text-sm leading-none">15일 🔥</div>
+              <div className="text-white font-extrabold text-sm leading-none">15일</div>
             </div>
           </div>
         </div>
@@ -463,13 +464,13 @@ function Slide4({ on, value, onChange }: { on: boolean; value: string; onChange:
 }
 
 /* ─── 슬라이드 5: 관심 카테고리 선택 ──────────── */
-const OB_CATS = [
-  { id: "exercise", label: "운동",  emoji: "💪", grad: ["#FF3355","#FF6680"] as [string,string] },
-  { id: "study",    label: "학습",  emoji: "📖", grad: ["#3b82f6","#6366f1"] as [string,string] },
-  { id: "reading",  label: "독서",  emoji: "📚", grad: ["#FB923C","#F59E0B"] as [string,string] },
-  { id: "habit",    label: "습관",  emoji: "🌱", grad: ["#22c55e","#16a34a"] as [string,string] },
-  { id: "hobby",    label: "취미",  emoji: "🎨", grad: ["#a855f7","#7c3aed"] as [string,string] },
-  { id: "etc",      label: "기타",  emoji: "✨", grad: ["#38BDF8","#0EA5E9"] as [string,string] },
+const OB_CATS: Array<{ id: string; label: string; Icon: LucideIcon; grad: [string, string] }> = [
+  { id: "exercise", label: "운동",  Icon: Dumbbell, grad: ["#FF3355","#FF6680"] },
+  { id: "study",    label: "학습",  Icon: BookOpen, grad: ["#3b82f6","#6366f1"] },
+  { id: "reading",  label: "독서",  Icon: Library,  grad: ["#FB923C","#F59E0B"] },
+  { id: "habit",    label: "습관",  Icon: Sprout,   grad: ["#22c55e","#16a34a"] },
+  { id: "hobby",    label: "취미",  Icon: Palette,  grad: ["#a855f7","#7c3aed"] },
+  { id: "etc",      label: "기타",  Icon: Sparkles, grad: ["#38BDF8","#0EA5E9"] },
 ];
 
 function Slide5({ on, selected, toggle }: {
@@ -527,7 +528,7 @@ function Slide5({ on, selected, toggle }: {
                     <CheckCircle2 className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
                   </div>
                 )}
-                <div className="text-[26px] mb-2 leading-none">{cat.emoji}</div>
+                <cat.Icon className={`w-7 h-7 mb-2 ${isOn ? "text-white" : "text-white/70"}`} strokeWidth={2.2} />
                 <p className="text-white font-bold text-[14px]">{cat.label}</p>
               </button>
             );
@@ -575,7 +576,7 @@ function Slide6({ on, selected, toggle, groups }: {
           {groups.map((ch, i) => {
             const isOn = selected.includes(ch.id);
             const maxed = selected.length >= 2 && !isOn;
-            const emoji = VERIFY_TYPES[ch.verifyType]?.emoji ?? "🎯";
+            const VtIcon = VERIFY_TYPES[ch.verifyType]?.Icon ?? Target;
             return (
               <button
                 key={ch.id}
@@ -604,7 +605,7 @@ function Slide6({ on, selected, toggle, groups }: {
                     style={{ background: "linear-gradient(to right,rgba(0,0,0,0.72) 0%,rgba(0,0,0,0.25) 100%)" }}
                   />
                   <div className="absolute inset-0 flex items-center px-4 gap-3">
-                    <span className="text-[22px] leading-none shrink-0">{emoji}</span>
+                    <VtIcon className="w-6 h-6 text-white shrink-0" strokeWidth={2.2} />
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-black text-[15px] leading-tight">{ch.title}</p>
                       <p className="text-white/50 text-[11px] mt-0.5">{ch.members}명 참여 중</p>

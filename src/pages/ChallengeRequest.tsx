@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft, Search, ChevronUp, ChevronDown, MessageCircle, Share2,
   Bell, Plus, X, Flame, CheckCircle, Clock, Send, Heart, ArrowRight, ImageIcon,
+  Dumbbell, BookOpen, Zap, Salad, Sparkles, Vote, Wrench, Eye, Calendar, Camera, Pencil, Mail, PartyPopper, Check,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { shareOrCopy } from "../lib/share";
@@ -28,14 +30,14 @@ interface Suggestion {
 }
 
 
-const CAT_EMOJI: Record<string, string> = {
-  "운동/건강": "💪", "독서/공부": "📖", "생산성": "⚡", "마음챙김": "🧘", "식습관": "🥗", "기타": "✨",
+const CAT_ICON: Record<string, LucideIcon> = {
+  "운동/건강": Dumbbell, "독서/공부": BookOpen, "생산성": Zap, "마음챙김": Heart, "식습관": Salad, "기타": Sparkles,
 };
 
-const STATUS_META: Record<Status, { label: string; emoji: string; color: string; bg: string }> = {
-  "투표중":   { label: "모으는 중",   emoji: "🗳️",  color: "#FF3355", bg: "rgba(255,51,85,0.07)" },
-  "개발확정": { label: "만드는 중",   emoji: "🛠️",  color: "#059669", bg: "#ecfdf5" },
-  "검토중":   { label: "검토 중",    emoji: "👀",  color: "#78716c", bg: "#fafaf9" },
+const STATUS_META: Record<Status, { label: string; Icon: LucideIcon; color: string; bg: string }> = {
+  "투표중":   { label: "모으는 중", Icon: Vote,   color: "#FF3355", bg: "rgba(255,51,85,0.07)" },
+  "개발확정": { label: "만드는 중", Icon: Wrench, color: "#059669", bg: "#ecfdf5" },
+  "검토중":   { label: "검토 중",   Icon: Eye,    color: "#78716c", bg: "#fafaf9" },
 };
 
 function relativeDay(iso: string) {
@@ -125,14 +127,16 @@ function NoteCard({
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5">
               <span
-                className="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full"
                 style={{ color: meta.color, background: meta.bg }}
               >
-                {meta.emoji} {meta.label}
+                <meta.Icon className="w-3 h-3" strokeWidth={2.4} />
+                {meta.label}
               </span>
               {isHot && (
-                <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-500">
-                  🔥 인기
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-500">
+                  <Flame className="w-3 h-3" strokeWidth={2.4} fill="currentColor" />
+                  인기
                 </span>
               )}
               {s.isMine && (
@@ -158,15 +162,23 @@ function NoteCard({
             <div className="mb-3 pb-3 border-b border-slate-100" style={{ animation: "g-fade 0.2s ease both" }}>
               <p className="text-[13px] text-slate-500 leading-relaxed mb-2">{s.desc}</p>
               <div className="flex gap-1.5 flex-wrap">
-                <span className="text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
-                  {CAT_EMOJI[s.category]} {s.category}
-                </span>
-                <span className="text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
-                  📅 {s.duration}
+                {(() => {
+                  const CatIcon = CAT_ICON[s.category] ?? Sparkles;
+                  return (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
+                      <CatIcon className="w-3 h-3" strokeWidth={2.2} />
+                      {s.category}
+                    </span>
+                  );
+                })()}
+                <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
+                  <Calendar className="w-3 h-3" strokeWidth={2.2} />
+                  {s.duration}
                 </span>
                 {s.verifyMethod && (
-                  <span className="text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
-                    📸 {s.verifyMethod}
+                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
+                    <Camera className="w-3 h-3" strokeWidth={2.2} />
+                    {s.verifyMethod}
                   </span>
                 )}
               </div>
@@ -233,9 +245,9 @@ function NoteCard({
       style={{ ...entry, boxShadow: "0 1px 8px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)" }}
     >
       <div className="px-4 py-3.5 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl shrink-0"
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
           style={{ background: meta.bg }}>
-          {meta.emoji}
+          <meta.Icon className="w-4 h-4" style={{ color: meta.color }} strokeWidth={2.2} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
@@ -271,10 +283,10 @@ function ListView({
   const listScrollRef = useRef<HTMLDivElement>(null);
   useScrollRestoration("cr-list-scroll", listScrollRef, !loading);
 
-  const tabs: { key: Tab; label: string }[] = [
+  const tabs: { key: Tab; label: string; Icon?: LucideIcon }[] = [
     { key: "전체",     label: "전체" },
-    { key: "모으는중", label: "🗳️ 모으는 중" },
-    { key: "만드는중", label: "🛠️ 만드는 중" },
+    { key: "모으는중", label: "모으는 중", Icon: Vote },
+    { key: "만드는중", label: "만드는 중", Icon: Wrench },
     { key: "내건의",   label: "내 건의" },
   ];
 
@@ -321,12 +333,13 @@ function ListView({
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-bold transition-all active:scale-95 ${
+            className={`shrink-0 inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-[13px] font-bold transition-all active:scale-95 ${
               tab === t.key
                 ? "bg-slate-900 text-white"
                 : "bg-slate-100 text-slate-500"
             }`}
           >
+            {t.Icon && <t.Icon className="w-3.5 h-3.5" strokeWidth={2.2} />}
             {t.label}
           </button>
         ))}
@@ -393,7 +406,8 @@ function ListView({
             boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
           }}
         >
-          ✏️ &nbsp;건의하고 싶은 챌린지가 있어요
+          <Pencil className="w-4 h-4" strokeWidth={2.2} />
+          건의하고 싶은 챌린지가 있어요
         </button>
       </div>
     </div>
@@ -406,21 +420,21 @@ function ListView({
 const WIZARD_STEPS = [
   {
     key: "name",
-    question: "어떤 챌린지를\n만들고 싶으세요? ✏️",
+    question: "어떤 챌린지를\n만들고 싶으세요?",
     hint: "챌린지 이름을 간단하게 적어주세요",
     placeholder: "예) 매일 스트레칭 10분 챌린지",
     type: "input" as const,
   },
   {
     key: "reason",
-    question: "왜 이 챌린지가\n필요한가요? 💬",
+    question: "왜 이 챌린지가\n필요한가요?",
     hint: "어떤 습관을 만들고 싶은지, 어떤 점이 좋은지 알려주세요",
     placeholder: "아침마다 스트레칭하면 몸도 마음도 가벼워지거든요...",
     type: "textarea" as const,
   },
   {
     key: "details",
-    question: "마지막으로\n조금만 더요! 🙌",
+    question: "마지막으로\n조금만 더요!",
     hint: "카테고리와 기간을 선택해주세요",
     type: "details" as const,
   },
@@ -518,13 +532,13 @@ function NewRequestView({ onBack, onCreate }: { onBack: () => void; onCreate: (p
 
         {/* 편지 날아오르기 */}
         <div style={{ animation: "letter-fly 0.95s cubic-bezier(0.34,1.56,0.64,1) both" }}>
-          <div className="w-24 h-24 rounded-3xl flex items-center justify-center text-6xl"
+          <div className="w-24 h-24 rounded-3xl flex items-center justify-center"
             style={{
               background: "linear-gradient(135deg, rgba(255,51,85,0.08), rgba(255,51,85,0.04))",
               border: "2px solid rgba(255,51,85,0.12)",
               boxShadow: "0 12px 40px rgba(255,51,85,0.15)",
             }}>
-            ✉️
+            <Mail className="w-12 h-12 text-[#FF3355]" strokeWidth={1.8} />
           </div>
         </div>
 
@@ -533,9 +547,9 @@ function NewRequestView({ onBack, onCreate }: { onBack: () => void; onCreate: (p
           <h2 className="text-[22px] font-black text-slate-900 mb-3 leading-snug">
             챌린지가 성공적으로<br />요청되었어요!
           </h2>
-          <p className="text-[14px] text-slate-500 leading-relaxed">
-            운영팀이 검토 후 개발 여부를<br />
-            알림으로 알려드릴게요 🔔
+          <p className="text-[14px] text-slate-500 leading-relaxed inline-flex flex-col items-center">
+            <span>운영팀이 검토 후 개발 여부를</span>
+            <span className="inline-flex items-center gap-1">알림으로 알려드릴게요 <Bell className="w-4 h-4 text-slate-500" strokeWidth={2.2} /></span>
           </p>
         </div>
 
@@ -632,19 +646,23 @@ function NewRequestView({ onBack, onCreate }: { onBack: () => void; onCreate: (p
             <div>
               <p className="text-[13px] font-semibold text-slate-600 mb-2.5">카테고리 <span className="text-[#FF3355]">*</span></p>
               <div className="grid grid-cols-3 gap-2">
-                {categories.map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setCategory(category === c ? null : c)}
-                    className={`py-2.5 rounded-xl text-[12px] font-semibold border transition-all active:scale-95 ${
-                      category === c
-                        ? "bg-slate-900 text-white border-slate-900"
-                        : "bg-white text-slate-600 border-slate-200"
-                    }`}
-                  >
-                    {CAT_EMOJI[c]} {c.split("/")[0]}
-                  </button>
-                ))}
+                {categories.map(c => {
+                  const CatIcon = CAT_ICON[c] ?? Sparkles;
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => setCategory(category === c ? null : c)}
+                      className={`inline-flex items-center justify-center gap-1 py-2.5 rounded-xl text-[12px] font-semibold border transition-all active:scale-95 ${
+                        category === c
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-white text-slate-600 border-slate-200"
+                      }`}
+                    >
+                      <CatIcon className="w-3.5 h-3.5" strokeWidth={2.2} />
+                      {c.split("/")[0]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -721,7 +739,7 @@ function NewRequestView({ onBack, onCreate }: { onBack: () => void; onCreate: (p
             canNext ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-400"
           }`}
         >
-          {submitting ? "저장 중..." : isLast ? "건의 제출하기 ✉️" : <>다음 <ArrowRight className="w-4 h-4" /></>}
+          {submitting ? "저장 중..." : isLast ? <>건의 제출하기 <Mail className="w-4 h-4" strokeWidth={2.2} /></> : <>다음 <ArrowRight className="w-4 h-4" /></>}
         </button>
       </div>
     </div>
@@ -782,12 +800,22 @@ function DetailView({
               className="inline-flex items-center gap-1.5 text-[13px] font-bold px-3 py-1.5 rounded-full"
               style={{ color: meta.color, background: meta.bg }}
             >
-              {meta.emoji} {meta.label}
+              <meta.Icon className="w-3.5 h-3.5" strokeWidth={2.4} />
+              {meta.label}
             </span>
-            <span className="text-[12px] text-slate-400 bg-slate-100 px-2.5 py-1.5 rounded-full">
-              {CAT_EMOJI[suggestion.category]} {suggestion.category}
+            {(() => {
+              const CatIcon = CAT_ICON[suggestion.category] ?? Sparkles;
+              return (
+                <span className="inline-flex items-center gap-1 text-[12px] text-slate-400 bg-slate-100 px-2.5 py-1.5 rounded-full">
+                  <CatIcon className="w-3 h-3" strokeWidth={2.2} />
+                  {suggestion.category}
+                </span>
+              );
+            })()}
+            <span className="inline-flex items-center gap-1 text-[12px] text-slate-400 bg-slate-100 px-2.5 py-1.5 rounded-full">
+              <Calendar className="w-3 h-3" strokeWidth={2.2} />
+              {suggestion.duration}
             </span>
-            <span className="text-[12px] text-slate-400 bg-slate-100 px-2.5 py-1.5 rounded-full">📅 {suggestion.duration}</span>
           </div>
 
           <h1 className="text-[22px] font-bold text-slate-900 leading-snug mb-2">{suggestion.title}</h1>
@@ -850,14 +878,15 @@ function DetailView({
                 <CheckCircle className="w-4 h-4 text-emerald-600" />
                 <p className="text-[14px] font-bold text-emerald-800">지금 만들고 있어요!</p>
               </div>
-              <p className="text-[13px] text-emerald-700 leading-relaxed mb-3">출시되면 제일 먼저 알려드릴게요 🎉</p>
+              <p className="text-[13px] text-emerald-700 leading-relaxed mb-3 inline-flex items-center gap-1">출시되면 제일 먼저 알려드릴게요 <PartyPopper className="w-3.5 h-3.5 text-emerald-600" strokeWidth={2.4} /></p>
               <button
                 onClick={() => void onSubscribe(suggestion.id, !notifyOn)}
                 className={`w-full py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.97] ${
                   notifyOn ? "bg-emerald-600 text-white" : "bg-white text-emerald-700 border border-emerald-200"
                 }`}
               >
-                <Bell className="w-4 h-4" />{notifyOn ? "알림 신청됨 ✓" : "출시 알림 받기"}
+                <Bell className="w-4 h-4" />
+                {notifyOn ? <>알림 신청됨 <Check className="w-3.5 h-3.5" strokeWidth={2.6} /></> : "출시 알림 받기"}
               </button>
             </div>
           )}

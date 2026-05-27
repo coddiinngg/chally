@@ -1,4 +1,4 @@
-import { ChevronLeft, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { ChevronLeft, Eye, EyeOff, ArrowRight, Mail } from "lucide-react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { cn } from "../lib/utils";
@@ -43,7 +43,9 @@ export function SignUp() {
   if (emailSent) {
     return (
       <div className="flex flex-col h-full bg-white dark:bg-[#0F1117] items-center justify-center px-8">
-        <div className="text-[64px] mb-6">📧</div>
+        <div className="w-20 h-20 rounded-3xl bg-[#FFE8EC] flex items-center justify-center mb-6">
+          <Mail className="w-10 h-10 text-[#FF3355]" strokeWidth={2} />
+        </div>
         <h2 className="text-[24px] font-black text-slate-900 dark:text-white text-center mb-3">이메일을 확인해주세요!</h2>
         <p className="text-slate-500 dark:text-white/50 text-[14px] text-center leading-relaxed mb-8">
           <span className="text-slate-900 dark:text-white font-bold">{email}</span>으로{"\n"}

@@ -185,7 +185,6 @@ function NotifCard({
         style={{
           opacity: mounted ? 1 : 0,
           animation: `nf-in 0.35s ease ${index * 50}ms both`,
-          boxShadow: "0 2px 12px rgba(255,51,85,0.08)",
         }}
       >
         <button

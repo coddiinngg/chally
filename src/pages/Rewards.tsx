@@ -163,7 +163,6 @@ export function Rewards() {
             style={{
               ...anim(40),
               background: "linear-gradient(135deg, #FF3355 0%, #E8254A 50%, #C8002B 100%)",
-              boxShadow: "0 10px 28px rgba(255,51,85,0.30)",
             }}
           >
             {/* 코너 광원 */}
@@ -278,7 +277,7 @@ export function Rewards() {
                 <p className="text-white/65 text-[11px] mt-2.5 text-center font-medium">
                   {nextGrade
                     ? <>다음 등급까지 <span className="font-black text-white tabular-nums">{xpToNext.toLocaleString()} XP</span></>
-                    : <span className="font-bold text-white">🎉 모든 등급 달성</span>
+                    : <span className="inline-flex items-center gap-1 font-bold text-white"><Sparkles className="w-3.5 h-3.5" strokeWidth={2.6} />모든 등급 달성</span>
                   }
                 </p>
               </div>

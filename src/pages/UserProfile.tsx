@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ChevronLeft, Flame, Trophy, TrendingUp, ChevronRight } from "lucide-react";
+import { ChevronLeft, Flame, Trophy, TrendingUp, ChevronRight, Medal } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { getGrade, getNextGrade } from "../lib/grades";
@@ -243,7 +243,7 @@ export function UserProfile() {
               </div>
             ) : joinedGroups.length === 0 ? (
               <div className="rounded-2xl bg-white border border-black/[0.04] p-8 flex flex-col items-center" style={{ boxShadow: CARD_SHADOW }}>
-                <span className="text-3xl mb-2">🏅</span>
+                <Medal className="w-8 h-8 text-slate-300 mb-2" strokeWidth={2} />
                 <p className="text-[13px] text-slate-400">참여 챌린지 정보가 없습니다</p>
               </div>
             ) : (
@@ -278,7 +278,7 @@ export function UserProfile() {
               </div>
               {pastGroups.length === 0 ? (
                 <div className="rounded-2xl bg-white border border-black/[0.04] p-8 flex flex-col items-center" style={{ boxShadow: CARD_SHADOW }}>
-                  <span className="text-3xl mb-2">🏆</span>
+                  <Trophy className="w-8 h-8 text-slate-300 mb-2" strokeWidth={2} />
                   <p className="text-[13px] text-slate-400">아직 완주한 챌린지가 없어요</p>
                 </div>
               ) : (

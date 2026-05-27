@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { Trophy, Zap, Flame, Users, ArrowRight, ChevronLeft, Crown, CheckCircle2, Calendar, ImageIcon } from "lucide-react";
+import { Trophy, Zap, Flame, Users, ArrowRight, ChevronLeft, Crown, CheckCircle2, Calendar, ImageIcon, PartyPopper, Dumbbell, DoorOpen, Hand, Camera } from "lucide-react";
 import { useApp, type Group } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
@@ -377,7 +377,10 @@ export function ChallengeResult() {
 
       {/* ── 챌린지 종류별 축하 멘트 ── */}
       <div className="relative z-20 shrink-0 px-5 pt-1 pb-3 flex items-center gap-2">
-        <span className="text-[18px] leading-none">{vt?.emoji ?? "🎉"}</span>
+        {vt
+          ? <vt.Icon className="w-[18px] h-[18px]" style={{ color: "#FF3355" }} strokeWidth={2.2} />
+          : <PartyPopper className="w-[18px] h-[18px]" style={{ color: "#FF3355" }} strokeWidth={2.2} />
+        }
         <p className="text-slate-900 font-black text-[15px] leading-snug">
           {congratsMsg}
         </p>
@@ -426,8 +429,8 @@ export function ChallengeResult() {
               >
                 {vt && (
                   <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-[20px]">
-                      {vt.emoji}
+                    <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
+                      <vt.Icon className="w-5 h-5 text-slate-600" strokeWidth={2.2} />
                     </div>
                     <div>
                       <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">인증 방식</p>
@@ -560,7 +563,9 @@ export function ChallengeResult() {
                       {post.photo_url ? (
                         <img src={post.photo_url} alt="" className="w-full h-full object-cover" draggable={false} />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-2xl">📸</div>
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Camera className="w-6 h-6 text-slate-400" strokeWidth={2} />
+                        </div>
                       )}
                       <div className="absolute bottom-0 inset-x-0 px-1.5 py-1"
                         style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.7))" }}>
@@ -625,7 +630,7 @@ export function ChallengeResult() {
               </>
             )}
             <div
-              className="relative w-28 h-28 rounded-full flex items-center justify-center text-[54px] mb-4"
+              className="relative w-28 h-28 rounded-full flex items-center justify-center mb-4"
               style={{
                 background: achieved
                   ? "linear-gradient(135deg, rgba(255,51,85,0.22), rgba(255,160,122,0.16))"
@@ -635,7 +640,10 @@ export function ChallengeResult() {
                 animation: mounted && currentSlide === 0 ? "cr-pop 0.6s cubic-bezier(0.34,1.56,0.64,1) both" : "none",
               }}
             >
-              {achieved ? "🏆" : "💪"}
+              {achieved
+                ? <Trophy className="w-14 h-14" style={{ color: "#FF3355" }} strokeWidth={2} />
+                : <Dumbbell className="w-14 h-14 text-slate-500" strokeWidth={2} />
+              }
             </div>
             <h1 className="relative text-slate-900 font-black text-[28px] leading-none">
               챌린지 {achieved ? "달성" : "미달성"}
@@ -652,7 +660,10 @@ export function ChallengeResult() {
                 className="rounded-3xl px-5 py-4 flex items-start gap-3"
                 style={{ background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.06)" }}
               >
-                <span className="text-[20px] mt-0.5 shrink-0">{group.isRemoved ? "🚪" : "👋"}</span>
+                {group.isRemoved
+                  ? <DoorOpen className="w-5 h-5 mt-0.5 shrink-0 text-slate-500" strokeWidth={2.2} />
+                  : <Hand className="w-5 h-5 mt-0.5 shrink-0 text-slate-500" strokeWidth={2.2} />
+                }
                 <div className="flex-1 min-w-0">
                   <p className="text-slate-900 font-black text-[13px] mb-0.5">
                     {group.isRemoved ? "이 그룹에서 퇴장됐어요" : "이 그룹에서 탈퇴했어요"}
@@ -699,8 +710,11 @@ export function ChallengeResult() {
                     {stats?.crewRate ?? group.crewRate}
                     <span className="text-[22px] font-black ml-0.5">%</span>
                   </p>
-                  <p className="text-slate-500 text-[11px] mt-0.5 font-medium">
-                    {achieved ? "목표 달성! 크루가 함께 해냈어요 🎉" : "아쉽게 목표에 못 미쳤어요"}
+                  <p className="text-slate-500 text-[11px] mt-0.5 font-medium inline-flex items-center gap-1">
+                    {achieved
+                      ? <>목표 달성! 크루가 함께 해냈어요 <PartyPopper className="w-3.5 h-3.5 text-amber-400" strokeWidth={2.4} /></>
+                      : "아쉽게 목표에 못 미쳤어요"
+                    }
                   </p>
                 </div>
 
@@ -782,13 +796,13 @@ export function ChallengeResult() {
                 <p className="text-slate-500 text-[13px] leading-relaxed">
                   챌리가 참가권을 드려요!<br />
                   <span className="text-slate-900 font-bold">리워드 탭</span>에서 혜택을 확인하고<br />
-                  다음 챌린지에도 참여해보세요 🎉
+                  <span className="inline-flex items-center gap-1">다음 챌린지에도 참여해보세요 <PartyPopper className="w-3.5 h-3.5 text-amber-400" strokeWidth={2.4} /></span>
                 </p>
               ) : (
                 <p className="text-slate-500 text-[13px] leading-relaxed">
                   이번엔 아쉬웠지만 괜찮아요!<br />
                   <span className="text-slate-900 font-bold">다른 챌린지</span>에 도전하면서<br />
-                  습관을 계속 이어가세요 🔥
+                  <span className="inline-flex items-center gap-1">습관을 계속 이어가세요 <Flame className="w-3.5 h-3.5" style={{ color: "#FF3355" }} fill="#FF3355" strokeWidth={2} /></span>
                 </p>
               )}
             </div>

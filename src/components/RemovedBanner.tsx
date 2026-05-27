@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { X } from "lucide-react";
+import { X, DoorOpen } from "lucide-react";
 import { useApp } from "../contexts/AppContext";
 
 const AUTO_DISMISS_MS = 5000;
@@ -34,7 +34,7 @@ export function RemovedBanner() {
           animation: "rb-slide-down 0.32s cubic-bezier(0.34,1.56,0.64,1) both",
         }}
       >
-        <span className="text-[20px] leading-none shrink-0">🚪</span>
+        <DoorOpen className="w-5 h-5 text-white shrink-0" strokeWidth={2.2} />
         <div className="flex-1 min-w-0">
           <p className="text-white font-black text-[13px] leading-tight truncate">
             '{current.groupName}'에서 퇴장됐어요

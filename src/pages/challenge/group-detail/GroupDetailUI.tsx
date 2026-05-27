@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ChevronLeft, Share2, Flame, Crown, Copy, Check, X, Camera, MoreHorizontal, LogOut, ShieldCheck, ShieldOff, Clock, Trophy } from "lucide-react";
+import { ChevronLeft, Share2, Flame, Crown, Copy, Check, X, Camera, MoreHorizontal, LogOut, ShieldCheck, ShieldOff, Clock, Trophy, Calendar, Rocket, Dumbbell, MessageCircle, DoorOpen, Hand, Flag, Hourglass, CheckCircle2 } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { cn } from "../../../lib/utils";
 import { useApp } from "../../../contexts/AppContext";
@@ -466,8 +466,9 @@ export function GroupDetailUI() {
                   </span>
                 );
               })()}
-              <span className="px-3 py-1 rounded-full text-[11px] font-bold text-white/80 bg-white/15 backdrop-blur-sm">
-                {vt.emoji} {vt.label}
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold text-white/80 bg-white/15 backdrop-blur-sm">
+                <vt.Icon className="w-3 h-3" strokeWidth={2.2} />
+                {vt.label}
               </span>
               {group.joined && (
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold text-white bg-white/20 backdrop-blur-sm">
@@ -478,8 +479,9 @@ export function GroupDetailUI() {
             <h2 className="text-[28px] font-black text-white tracking-tight leading-tight">{group.title}</h2>
             <p className="text-white/75 mt-1.5 text-[13px] leading-relaxed">{group.desc}</p>
             {fmtPeriod(group.challengeStart, group.challengeEnd) && (
-              <p className="text-white/45 mt-2 text-[11px] font-semibold">
-                📅 {fmtPeriod(group.challengeStart, group.challengeEnd)}
+              <p className="text-white/45 mt-2 text-[11px] font-semibold inline-flex items-center gap-1">
+                <Calendar className="w-3 h-3" strokeWidth={2.2} />
+                {fmtPeriod(group.challengeStart, group.challengeEnd)}
               </p>
             )}
           </div>
@@ -521,7 +523,7 @@ export function GroupDetailUI() {
             </div>
             <div className="bg-slate-50 rounded-xl px-3.5 py-3 flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#FFE8EC] flex items-center justify-center shrink-0">
-                <span className="text-[16px]">{vt.emoji}</span>
+                <vt.Icon className="w-4 h-4 text-[#FF3355]" strokeWidth={2.2} />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] text-slate-400 font-semibold">인증 방식</p>
@@ -536,7 +538,10 @@ export function GroupDetailUI() {
           <div className="mx-4 mt-4 rounded-2xl overflow-hidden bg-slate-50 border border-slate-200"
             style={{ animation: "noti-drop 0.3s ease both" }}>
             <div className="px-4 py-3.5 flex items-start gap-3">
-              <span className="text-[20px] mt-0.5 shrink-0">{group.isRemoved || crewStatus?.my_status === "REMOVED" ? "🚪" : "👋"}</span>
+              {group.isRemoved || crewStatus?.my_status === "REMOVED"
+                ? <DoorOpen className="w-5 h-5 mt-0.5 shrink-0 text-slate-500" strokeWidth={2.2} />
+                : <Hand className="w-5 h-5 mt-0.5 shrink-0 text-slate-500" strokeWidth={2.2} />
+              }
               <div className="flex-1 min-w-0">
                 <p className="text-slate-700 font-black text-[13px] mb-0.5">
                   {group.isRemoved || crewStatus?.my_status === "REMOVED" ? "이 그룹에서 퇴장됐어요" : "이 그룹에서 탈퇴했어요"}
@@ -554,7 +559,7 @@ export function GroupDetailUI() {
           <div className="mx-4 mt-4 rounded-2xl overflow-hidden"
             style={{ background: "linear-gradient(115deg,#FF3355,#FF6680)", boxShadow: "0 4px 16px rgba(255,51,85,0.25)", animation: "noti-drop 0.3s ease both" }}>
             <div className="px-4 py-4 flex items-start gap-3">
-              <span className="text-2xl mt-0.5 shrink-0">🚀</span>
+              <Rocket className="w-6 h-6 mt-0.5 shrink-0 text-white" strokeWidth={2} />
               <div className="flex-1 min-w-0">
                 <p className="text-white font-black text-[14px] leading-snug mb-1">챌린지가 시작됐어요!</p>
                 <p className="text-white/80 text-[12px] leading-relaxed">
@@ -582,7 +587,7 @@ export function GroupDetailUI() {
           <div className="mx-4 mt-4 rounded-2xl overflow-hidden bg-amber-50 border border-amber-100"
             style={{ animation: "noti-drop 0.3s ease both" }}>
             <div className="px-4 py-3.5 flex items-start gap-3">
-              <span className="text-xl shrink-0 mt-0.5">💪</span>
+              <Dumbbell className="w-5 h-5 shrink-0 mt-0.5 text-amber-500" strokeWidth={2.2} />
               <div className="flex-1 min-w-0">
                 <p className="text-amber-700 font-black text-[13px] mb-0.5">함께 100%를 향해 가요 ({group.crewRate}%)</p>
                 <p className="text-amber-600 text-[12px] leading-relaxed">오늘 인증으로 크루 달성률을 한 칸 더 올려봐요!</p>
@@ -690,14 +695,15 @@ export function GroupDetailUI() {
           <div className="flex gap-1 p-1 bg-white rounded-2xl border border-black/[0.04]"
             style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
             {([
-              { key: "activity",    label: "💬  활동" },
-              { key: "leaderboard", label: "🏆  순위" },
-              { key: "gallery",     label: "📸  갤러리" },
-            ] as const).map(({ key: t, label }) => (
+              { key: "activity",    label: "활동",   Icon: MessageCircle },
+              { key: "leaderboard", label: "순위",   Icon: Trophy },
+              { key: "gallery",     label: "갤러리", Icon: Camera },
+            ] as const).map(({ key: t, label, Icon }) => (
               <button key={t} onClick={() => handleTabClick(t)}
-                className={cn("flex-1 py-2.5 rounded-xl text-[12px] font-black transition-all duration-200 active:scale-[0.97]",
+                className={cn("flex-1 py-2.5 rounded-xl text-[12px] font-black transition-all duration-200 active:scale-[0.97] inline-flex items-center justify-center gap-1.5",
                   tab === t ? "text-white" : "text-slate-400")}
                 style={tab === t ? { background: PG, boxShadow: "0 4px 14px rgba(255,51,85,0.35)" } : {}}>
+                <Icon className="w-3.5 h-3.5" strokeWidth={2.4} />
                 {label}
               </button>
             ))}
@@ -711,7 +717,7 @@ export function GroupDetailUI() {
               {/* 내 정보 카드 */}
               {myRank ? (
                 <div className="bg-white rounded-2xl overflow-hidden"
-                  style={{ border: "1.5px solid rgba(255,51,85,0.18)", boxShadow: "0 4px 16px rgba(255,51,85,0.08)" }}>
+                  style={{ border: "1.5px solid rgba(255,51,85,0.18)" }}>
                   {/* 상단: 기본 정보 */}
                   <div className="px-4 pt-3.5 pb-3 flex items-center gap-3">
                     <div className="relative shrink-0">
@@ -784,7 +790,7 @@ export function GroupDetailUI() {
                 </div>
               ) : group.joined ? (
                 <div className="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3"
-                  style={{ border: "1.5px solid rgba(255,51,85,0.12)", boxShadow: "0 4px 16px rgba(255,51,85,0.06)" }}>
+                  style={{ border: "1.5px solid rgba(255,51,85,0.12)" }}>
                   <div className="w-12 h-12 rounded-full bg-[#FFE8EC] flex items-center justify-center shrink-0">
                     <span className="text-[20px]">🙋</span>
                   </div>
@@ -797,8 +803,7 @@ export function GroupDetailUI() {
 
               {/* 포디엄 + 리스트 통합 카드 */}
               {leaderboard.length > 0 ? (
-                <div className="rounded-2xl overflow-hidden"
-                  style={{ boxShadow: "0 8px 32px rgba(255,51,85,0.15)" }}>
+                <div className="rounded-2xl overflow-hidden">
 
                 {/* 포디엄 영역 */}
                 <div style={{ background: "white", borderBottom: "1px solid rgba(255,51,85,0.1)" }}>
@@ -989,28 +994,28 @@ export function GroupDetailUI() {
         /* 강퇴됨 (진행 중) */
         ) : crewStatus?.my_status === "REMOVED" || group.isRemoved ? (
           <div className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-slate-100 border border-black/[0.06]">
-            <span className="text-[15px]">🚪</span>
+            <DoorOpen className="w-4 h-4 text-slate-400" strokeWidth={2.2} />
             <span className="text-[15px] font-black text-slate-400">퇴장됨 · 조회만 가능</span>
           </div>
 
         /* 탈퇴됨 (영구 — 재참여 불가) */
         ) : group.isLeft ? (
           <div className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-slate-100 border border-black/[0.06]">
-            <span className="text-[15px]">👋</span>
+            <Hand className="w-4 h-4 text-slate-400" strokeWidth={2.2} />
             <span className="text-[15px] font-black text-slate-400">탈퇴됨 · 조회만 가능</span>
           </div>
 
         /* 비참여 + 종료됨 */
         ) : phase === "ended" ? (
           <div className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-slate-100 border border-black/[0.06]">
-            <span className="text-[15px]">🏁</span>
+            <Flag className="w-4 h-4 text-slate-400" strokeWidth={2.2} />
             <span className="text-[15px] font-black text-slate-400">챌린지가 종료됐어요</span>
           </div>
 
         /* 참여중 + 모집중 → 아직 시작 전 */
         ) : group.joined && phase === "recruit" ? (
           <div className="w-full h-16 flex items-center justify-center gap-2.5 rounded-2xl bg-blue-50 border border-blue-100">
-            <span className="text-[18px]">⏳</span>
+            <Hourglass className="w-[18px] h-[18px] text-blue-400" strokeWidth={2.2} />
             <div className="flex flex-col items-start gap-1">
               <span className="text-[16px] font-black text-blue-400 leading-none">챌린지 시작을 기다리는 중이에요</span>
               {group.challengeStart && (
@@ -1037,7 +1042,8 @@ export function GroupDetailUI() {
             onClick={() => setShowJoinConfirm(true)}
             className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl text-white font-black text-[16px] active:scale-[0.98] transition-transform"
             style={{ background: PG, boxShadow: PS }}>
-            ✅ 챌린지 참여하기
+            <CheckCircle2 className="w-5 h-5" strokeWidth={2.4} />
+            챌린지 참여하기
           </button>
         )}
       </div>
@@ -1210,7 +1216,9 @@ export function GroupDetailUI() {
             style={{ animation: "sheet-up 0.35s cubic-bezier(0.4,0,0.2,1) both" }}>
             <div className="w-10 h-1 rounded-full bg-slate-200 mx-auto mb-5" />
             <div className="text-center mb-5">
-              <span className="text-[40px]">🚪</span>
+              <div className="inline-flex w-16 h-16 rounded-2xl bg-slate-100 items-center justify-center">
+                <DoorOpen className="w-8 h-8 text-slate-500" strokeWidth={2} />
+              </div>
               <h3 className="text-[18px] font-black text-slate-900 mt-2">탈퇴 하시겠습니까?</h3>
               <p className="text-[13px] text-slate-500 mt-2 leading-relaxed">
                 <span className="font-bold text-red-500">탈퇴 후 다시 참여할 수 없어요.</span><br />
@@ -1241,7 +1249,7 @@ function ActivityCard({
   mounted: boolean; delay: number; groupId: string; canReact?: boolean; key?: React.Key;
 }) {
   const navigate = useNavigate();
-  const typeEmoji = item.type === "verify" ? "📸" : item.type === "streak" ? "🔥" : item.type === "rank" ? "🏆" : "💬";
+  const TypeIcon  = item.type === "verify" ? Camera : item.type === "streak" ? Flame : item.type === "rank" ? Trophy : MessageCircle;
   const typeLabel = item.type === "verify" ? "인증" : item.type === "streak" ? "연속달성" : item.type === "rank" ? "순위" : "댓글";
   const typeBg    = item.type === "verify" ? "#FFF0F3" : item.type === "streak" ? "#FFF7ED" : "#F1F5F9";
   const typeColor = item.type === "verify" ? "#FF3355" : item.type === "streak" ? "#FB923C" : "#64748B";
@@ -1278,9 +1286,10 @@ function ActivityCard({
           <div className="w-full h-full" style={{ background: `linear-gradient(135deg,${item.grad[0]},${item.grad[1]})` }} />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-        <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full"
+        <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full inline-flex items-center gap-1"
           style={{ background: typeBg + "CC", backdropFilter: "blur(4px)" }}>
-          <span className="text-[9px] font-black" style={{ color: typeColor }}>{typeEmoji} {typeLabel}</span>
+          <TypeIcon className="w-2.5 h-2.5" style={{ color: typeColor }} strokeWidth={2.4} />
+          <span className="text-[9px] font-black" style={{ color: typeColor }}>{typeLabel}</span>
         </div>
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <button

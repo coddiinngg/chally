@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ChevronLeft, X, ChevronRight, CheckCircle2, ImageIcon, Share2 } from "lucide-react";
+import { ChevronLeft, X, ChevronRight, CheckCircle2, ImageIcon, Share2, ThumbsUp } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useApp } from "../contexts/AppContext";
 import { shareOrCopy } from "../lib/share";
@@ -602,7 +602,7 @@ export function Gallery() {
               </p>
               {(reactionMap.get(item.id) ?? 0) > 0 && (
                 <div className="flex items-center gap-1 bg-slate-200/80 dark:bg-white/15 backdrop-blur-sm rounded-full px-2 py-0.5">
-                  <span className="text-[12px] leading-none">👍</span>
+                  <ThumbsUp className="w-3 h-3 text-slate-700 dark:text-white" strokeWidth={2.2} />
                   <span className="text-slate-700 dark:text-white text-[11px] font-black tabular-nums">{reactionMap.get(item.id)}</span>
                 </div>
               )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, CheckCircle2, XCircle, Camera, AlertCircle } from "lucide-react";
+import { X, CheckCircle2, XCircle, Camera, AlertCircle, PartyPopper, Lightbulb, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../contexts/AppContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../../lib/verifyTypes";
@@ -141,7 +141,7 @@ export function Upload() {
           background: `${accent ?? "#FF3355"}${d ? "20" : "12"}`,
           border: `1px solid ${accent ?? "#FF3355"}35`,
         }}>
-        <span className="text-[13px]">{vt.emoji}</span>
+        <vt.Icon className="w-3.5 h-3.5" style={{ color: accent ?? "#FF3355" }} strokeWidth={2.4} />
         <span className={`text-[12px] font-semibold ${d ? "text-white" : "text-slate-700"}`}>{vt.label}</span>
       </div>
       <div className="w-9" />
@@ -202,7 +202,10 @@ export function Upload() {
 
           {/* 상태 텍스트 */}
           {isPassed ? (
-            <p className="font-black text-[22px]" style={{ color: d ? "white" : "#0f172a" }}>인증 완료! 🎉</p>
+            <p className="font-black text-[22px] inline-flex items-center gap-2" style={{ color: d ? "white" : "#0f172a" }}>
+              인증 완료!
+              <PartyPopper className="w-5 h-5 text-emerald-500" strokeWidth={2.2} />
+            </p>
           ) : (
             <div className="flex flex-col items-center gap-2">
               <p className="font-semibold text-[15px]" style={{ color: d ? "white" : "#334155" }}>AI 분석 중</p>
@@ -359,7 +362,7 @@ export function Upload() {
               boxShadow: d ? "none" : "0 1px 4px rgba(0,0,0,0.04)",
               animation: "upl-slide 0.4s ease 240ms both",
             }}>
-            <span className="text-[18px] shrink-0 mt-0.5">💡</span>
+            <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" strokeWidth={2.2} />
             <p className="text-[12px] leading-relaxed"
               style={{ color: d ? "rgba(255,255,255,0.45)" : "#64748b" }}>{vt.tip}</p>
           </div>
@@ -390,7 +393,7 @@ export function Upload() {
     <Bg glow="radial-gradient(ellipse at 50% 35%, rgba(251,191,36,0.1) 0%, transparent 60%)">
       <TopBar />
       <div className="flex-1 flex flex-col items-center justify-center px-8 relative z-10 gap-4">
-        <p className="text-[36px]">⚠️</p>
+        <AlertTriangle className="w-10 h-10 text-amber-500" strokeWidth={2} />
         <p className="font-bold text-[17px] text-center" style={{ color: d ? "white" : "#0f172a" }}>분석 중 오류가 발생했어요</p>
         <p className="text-[12px] text-center leading-relaxed" style={{ color: d ? "rgba(255,255,255,0.4)" : "#94a3b8" }}>
           {errorMessage || "네트워크를 확인하고 다시 시도해주세요"}
