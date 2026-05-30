@@ -1387,15 +1387,9 @@ export function Home() {
                     24시간 안에 인증하지 않으면 퇴장돼요
                   </span>
                 ) : selectedGroup ? (
-                  (() => {
-                    const VtIcon = VERIFY_TYPES[(selectedGroup.verifyType as VerifyTypeKey) ?? "step_walk"]?.Icon ?? Activity;
-                    return (
-                      <span className="text-white/85 text-[12px] font-medium leading-none truncate inline-flex items-center gap-1">
-                        <VtIcon className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
-                        <span className="truncate">{selectedGroup.goal}</span>
-                      </span>
-                    );
-                  })()
+                  <span className="text-white/85 text-[12px] font-medium leading-none truncate">
+                    {selectedGroup.goal}
+                  </span>
                 ) : (
                   <span className="text-white/85 text-[12px] font-medium leading-none truncate">챌린지에 참여하고 인증해보세요</span>
                 )}
