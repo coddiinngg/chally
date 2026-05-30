@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Footprints, Activity, PenLine, BookOpen, Camera, MapPin } from "lucide-react";
+import { Footprints, Activity, PenLine, BookOpen, Camera, MapPin, Utensils } from "lucide-react";
 
 export type VerifyTypeKey =
   | "step_walk"
@@ -7,7 +7,8 @@ export type VerifyTypeKey =
   | "quote_photo"
   | "book_cover"
   | "celeb_pose"
-  | "location_photo";
+  | "location_photo"
+  | "food_photo";
 
 export interface VerifyTypeData {
   label: string;
@@ -201,6 +202,33 @@ export const VERIFY_TYPES: Record<VerifyTypeKey, VerifyTypeData> = {
       "실내 일반 공간 (무의미한 장소)",
     ],
     exampleImg: "https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=600&fit=crop&q=80",
+  },
+
+  food_photo: {
+    label: "음식 인증",
+    emoji: "🍽️",
+    Icon: Utensils,
+    desc: "오늘 먹은 음식을 사진으로 남겨요",
+    guide: [
+      "오늘 먹은 음식이나 음료를 찍어요",
+      "음식이 무엇인지 알아볼 수 있게 담아요",
+      "집밥·외식·카페 어디든 OK",
+    ],
+    tip: "맛이나 메뉴 이름을 댓글로 남기면 멤버들과 더 즐거워요!",
+    hint: "음식이 프레임 안에 잘 보이게 담아주세요",
+    bgGrad: ["#FB7185", "#F43F5E"],
+    frameAspect: "square",
+    checklist: [
+      "음식 또는 음료 확인",
+      "무엇인지 알아볼 수 있는 밝기",
+      "초점·구도 적절",
+      "실내·외 무관",
+    ],
+    rejectReasons: [
+      "음식이나 음료가 보이지 않음",
+      "너무 어둡거나 흐려서 알아볼 수 없음",
+    ],
+    exampleImg: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&fit=crop&q=80",
   },
 };
 

@@ -17,7 +17,7 @@ const MAX_BODY_BYTES = 8 * 1024 * 1024;
 
 type VerifyTypeKey =
   | "step_walk" | "run_scenery" | "quote_photo"
-  | "book_cover" | "celeb_pose" | "location_photo";
+  | "book_cover" | "celeb_pose" | "location_photo" | "food_photo";
 
 interface VerifyTypeData {
   label: string;
@@ -110,6 +110,18 @@ const VERIFY_TYPES: Record<VerifyTypeKey, VerifyTypeData> = {
       "간판·건물명이 흐리거나 가려져 읽을 수 없음",
       "어두워서 배경 확인 불가",
       "일반 실내 공간 (무의미한 배경)",
+    ],
+  },
+  food_photo: {
+    label: "음식 인증",
+    desc: "오늘 먹은 음식을 사진으로 남겨요",
+    checklist: [
+      "사진에 음식 또는 음료가 보임",
+      "무엇을 먹었는지 알아볼 수 있을 만큼 충분한 밝기",
+    ],
+    rejectReasons: [
+      "음식이나 음료가 전혀 보이지 않음",
+      "너무 어둡거나 흐려서 음식을 알아볼 수 없음",
     ],
   },
 };
