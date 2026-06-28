@@ -9,6 +9,7 @@ import { VERIFY_TYPES, type VerifyTypeKey } from "../../../lib/verifyTypes";
 import { formatActivityTime, loadActivityFeed, type ActivityFeedItem } from "../../../lib/activity";
 import { getPhase, getBenefitGrade, phaseLabel } from "../../../lib/challengeUtils";
 import { useScrollRestoration } from "../../../lib/useScrollRestoration";
+import { FeedGridCard, FeedViewerOverlay } from "../../../components/FeedViewer";
 
 const PHASE_COLORS: Record<string, string> = {
   "모집중":   "#3B82F6",
@@ -37,18 +38,6 @@ interface CrewStatus {
   my_is_contributor: boolean;
   my_exit_deadline: string | null;
 }
-
-type ActivityItem = {
-  id?: string;
-  userId?: string;
-  name: string; seed: string; time: string; msg: string;
-  type: "verify" | "streak" | "rank" | "comment";
-  grad: [string, string];
-  photoUrl?: string | null;
-  avatarUrl?: string | null;
-  reactionCount?: number;
-  myReaction?: string | null;
-};
 
 const INVITE_BASE = "https://chally.app/join/GROUP-";
 const PG = "linear-gradient(115deg,#FF3355,#FF6680)";
@@ -98,7 +87,8 @@ export function GroupDetailUI() {
   const { groupId = "1" } = useParams<{ groupId: string }>();
   const { groups, groupsLoading, joinGroup, leaveGroup, markGroupLeft, beginVerification, verificationHistory } = useApp();
   const { user } = useAuth();
-  const { state: locState } = useLocation() as { state: { tab?: "leaderboard" | "activity" | "gallery"; skipAnimation?: boolean; fromActivityPhoto?: boolean } | null };
+  const location = useLocation();
+  const locState = location.state as { tab?: "leaderboard" | "activity" | "gallery"; skipAnimation?: boolean; fromActivityPhoto?: boolean; reopenViewerIdx?: number } | null;
 
   const group = groups.find(g => g.id === groupId);
   const initialDbId = group?.dbId ?? null;
@@ -131,6 +121,9 @@ export function GroupDetailUI() {
     return "activity";
   });
   const [lightbox, setLightbox]                 = useState<{ url: string; name: string; seed: string; avatarUrl?: string | null; time: string } | null>(null);
+  const [activityViewerOpen, setActivityViewerOpen] = useState(false);
+  const [activityViewerIdx, setActivityViewerIdx]   = useState(0);
+  const viewerRestoredRef = useRef(false);
   const [copied, setCopied]                     = useState(false);
   const [showInvite, setShowInvite]             = useState(false);
   const [showJoinConfirm, setShowJoinConfirm]   = useState(false);
@@ -333,21 +326,22 @@ export function GroupDetailUI() {
     return base;
   };
 
-  const dbActivity: ActivityItem[] = activityPosts.map((post, index) => ({
-    id: post.id,
-    userId: post.user_id,
-    name: authorLabel(post.author_name, post.authorMemberStatus),
-    seed: post.user_id,
-    time: formatActivityTime(post.created_at),
-    msg: post.message,
-    type: "verify",
-    grad: [["#FF3355", "#FF6680"], ["#38BDF8", "#0EA5E9"], ["#34d399", "#059669"]][index % 3] as [string, string],
-    photoUrl: post.photo_url,
-    avatarUrl: post.author_avatar_url,
-    reactionCount: post.reactionCount,
-    myReaction: post.myReaction,
+  const feedItems: ActivityFeedItem[] = activityPosts.map(post => ({
+    ...post,
+    author_name: authorLabel(post.author_name, post.authorMemberStatus),
   }));
-  const activityItems = dbActivity;
+
+  // 프로필에서 뒤로가기로 돌아왔을 때, 보던 활동 뷰어를 같은 사진으로 복원 (목록 준비 후 한 번만)
+  useEffect(() => {
+    if (viewerRestoredRef.current || feedItems.length === 0) return;
+    if (typeof locState?.reopenViewerIdx === "number") {
+      viewerRestoredRef.current = true;
+      setActivityViewerIdx(locState.reopenViewerIdx);
+      setActivityViewerOpen(true);
+      const { reopenViewerIdx: _omit, ...rest } = locState;
+      navigate(location.pathname + location.search, { replace: true, state: rest });
+    }
+  }, [feedItems.length, locState, navigate, location.pathname, location.search]);
 
   const galleryItems = activityPosts.filter(post => post.photo_url).map(post => ({
     url: post.photo_url ?? "",
@@ -903,26 +897,16 @@ export function GroupDetailUI() {
           ) : tab === "activity" ? (
             /* ── 활동 피드 ── */
             <div className="px-4 mt-3">
-              {activityItems.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="flex flex-col gap-2.5">
-                    {activityItems.filter((_, i) => i % 2 === 0).map((item, i) => {
-                      const imgSrc = item.photoUrl ?? undefined;
-                      return (
-                        <ActivityCard key={item.id ?? i} item={item} imgSrc={imgSrc}
-                          aspect={i === 0 ? "tall" : "square"} mounted={mounted} delay={i * 80} groupId={groupId} canReact={!isViewerOnly} />
-                      );
-                    })}
-                  </div>
-                  <div className="flex flex-col gap-2.5 mt-6">
-                    {activityItems.filter((_, i) => i % 2 === 1).map((item, i) => {
-                      const imgSrc = item.photoUrl ?? undefined;
-                      return (
-                        <ActivityCard key={item.id ?? i} item={item} imgSrc={imgSrc}
-                          aspect={i === 0 ? "square" : "tall"} mounted={mounted} delay={i * 80 + 40} groupId={groupId} canReact={!isViewerOnly} />
-                      );
-                    })}
-                  </div>
+              {feedItems.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {feedItems.map((item, i) => (
+                    <React.Fragment key={item.id}>
+                      <FeedGridCard
+                        item={item}
+                        onClick={() => { setActivityViewerIdx(i); setActivityViewerOpen(true); }}
+                      />
+                    </React.Fragment>
+                  ))}
                 </div>
               ) : activityLoading ? (
                 <div className="bg-white rounded-2xl px-5 py-8 text-center border border-black/[0.04]">
@@ -1047,6 +1031,17 @@ export function GroupDetailUI() {
           </button>
         )}
       </div>
+
+      {/* ── 활동 카드 세로 뷰어 ── */}
+      {activityViewerOpen && (
+        <FeedViewerOverlay
+          items={feedItems}
+          startIdx={activityViewerIdx}
+          userId={user?.id ?? null}
+          canReact={!isViewerOnly}
+          onClose={() => setActivityViewerOpen(false)}
+        />
+      )}
 
       {/* ── 갤러리 라이트박스 ── */}
       {lightbox && (
@@ -1238,72 +1233,6 @@ export function GroupDetailUI() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function ActivityCard({
-  item, imgSrc, aspect, mounted, delay, groupId, canReact = true,
-}: {
-  item: ActivityItem; imgSrc?: string; aspect: "tall" | "square";
-  mounted: boolean; delay: number; groupId: string; canReact?: boolean; key?: React.Key;
-}) {
-  const navigate = useNavigate();
-  const TypeIcon  = item.type === "verify" ? Camera : item.type === "streak" ? Flame : item.type === "rank" ? Trophy : MessageCircle;
-  const typeLabel = item.type === "verify" ? "인증" : item.type === "streak" ? "연속달성" : item.type === "rank" ? "순위" : "댓글";
-  const typeBg    = item.type === "verify" ? "#FFF0F3" : item.type === "streak" ? "#FFF7ED" : "#F1F5F9";
-  const typeColor = item.type === "verify" ? "#FF3355" : item.type === "streak" ? "#FB923C" : "#64748B";
-
-  return (
-    <div
-      className="rounded-2xl overflow-hidden bg-white border border-black/[0.04] shadow-sm active:scale-[0.97] transition-transform cursor-pointer"
-      style={{
-        opacity: mounted ? 1 : 0,
-        transform: mounted ? "none" : "translateY(12px)",
-        transition: `opacity 0.4s ease ${delay}ms, transform 0.4s ease ${delay}ms`,
-      }}
-      onClick={() => navigate(`/challenge/group/${groupId}/activity`, {
-        state: {
-          postId: item.id,
-          userId: item.userId,
-          imgSrc,
-          grad: item.grad,
-          name: item.name,
-          seed: item.seed,
-          time: item.time,
-          msg: item.msg,
-          type: item.type,
-          reactionCount: item.reactionCount,
-          myReaction: item.myReaction,
-          canReact,
-        },
-      })}
-    >
-      <div className={`relative ${aspect === "tall" ? "aspect-[3/4]" : "aspect-square"}`}>
-        {imgSrc ? (
-          <img src={imgSrc} alt={item.msg} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        ) : (
-          <div className="w-full h-full" style={{ background: `linear-gradient(135deg,${item.grad[0]},${item.grad[1]})` }} />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-        <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full inline-flex items-center gap-1"
-          style={{ background: typeBg + "CC", backdropFilter: "blur(4px)" }}>
-          <TypeIcon className="w-2.5 h-2.5" style={{ color: typeColor }} strokeWidth={2.4} />
-          <span className="text-[9px] font-black" style={{ color: typeColor }}>{typeLabel}</span>
-        </div>
-        <div className="absolute bottom-0 left-0 right-0 p-3">
-          <button
-            className="flex items-center gap-1.5 mb-1 w-full active:opacity-70 transition-opacity"
-            onClick={e => { e.stopPropagation(); navigate(`/user/${item.userId ?? item.seed}`); }}
-          >
-            <img src={item.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`}
-              className="w-5 h-5 rounded-full bg-white/20 shrink-0 object-cover" />
-            <span className="text-white text-[11px] font-black truncate">{item.name}</span>
-            <span className="text-white/50 text-[10px] ml-auto shrink-0">{item.time}</span>
-          </button>
-          <p className="text-white/80 text-[11px] leading-snug line-clamp-2">{item.msg}</p>
-        </div>
-      </div>
     </div>
   );
 }

@@ -51,7 +51,6 @@ export function Profile() {
 
   const completedVerifications = verificationHistory.filter((v) => v.status === "completed");
   const photoCount = completedVerifications.filter(v => v.photo_url).length;
-  const recentPhotoThumbs = completedVerifications.filter(v => v.photo_url).slice(0, 5).map(v => ({ id: v.id, src: v.photo_url as string }));
   const totalParticipated = groups.filter(g => g.joined && !g.isRemoved && !g.isLeft).length;
 
   const ticketAnim = useCountUp(participationTickets, 900, 700);
@@ -179,74 +178,12 @@ export function Profile() {
             )}
           </div>
 
-          {/* 나의 챌린지 */}
-          <div
-            onClick={() => navigate("/stats/challenge-history")}
-            className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.04] active:scale-[0.98] transition-transform duration-150 cursor-pointer"
-            style={{ ...slide(90), boxShadow: CARD_SHADOW }}
-          >
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-              style={{ background: "linear-gradient(135deg,#FF3355,#ff5570)", boxShadow: "0 4px 14px rgba(255,51,85,0.3)" }}
-            >
-              <Trophy className="w-6 h-6 text-white" strokeWidth={2.2} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[14px] font-black text-slate-900">나의 챌린지</p>
-              <p className="text-[12px] text-slate-400 mt-0.5">
-                {totalParticipated > 0 ? `총 ${totalParticipated}개 참여 · 이전 기록 보기` : "아직 참여한 챌린지가 없어요"}
-              </p>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-[#FFE8EC] flex items-center justify-center shrink-0">
-              <ChevronRight className="w-4 h-4 text-[#FF3355]" />
-            </div>
-          </div>
-
-          {/* 인증 히스토리 */}
-          <div
-            onClick={() => navigate("/gallery")}
-            className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-black/[0.04] active:scale-[0.98] transition-transform duration-150 cursor-pointer"
-            style={{ ...slide(105), boxShadow: CARD_SHADOW }}
-          >
-            <div className="shrink-0">
-              {recentPhotoThumbs.length > 0 ? (
-                <div className="flex -space-x-2">
-                  {recentPhotoThumbs.map(thumb => (
-                    <button
-                      key={thumb.id}
-                      onClick={e => { e.stopPropagation(); navigate("/gallery", { state: { openId: thumb.id } }); }}
-                      className="rounded-xl overflow-hidden border-2 border-white shrink-0 active:scale-90 transition-transform"
-                    >
-                      <img src={thumb.src} alt="최근 인증" className="w-10 h-10 object-cover" referrerPolicy="no-referrer" />
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center">
-                  <ImageIcon className="w-5 h-5 text-slate-400" />
-                </div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <ImageIcon className="w-3.5 h-3.5 text-[#FF3355]" />
-                <p className="text-[14px] font-black text-slate-900">인증 히스토리</p>
-              </div>
-              <p className="text-[12px] text-slate-400">
-                {photoCount > 0 ? `총 ${photoCount}장 · 갤러리에서 확인` : "아직 저장된 인증 사진이 없어요"}
-              </p>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-[#FFE8EC] flex items-center justify-center shrink-0">
-              <ChevronRight className="w-4 h-4 text-[#FF3355]" />
-            </div>
-          </div>
-
           {/* 참가권 — 챌린지 탭 톤의 빨강 포인트 배너 */}
           <div
             className="relative overflow-hidden rounded-2xl px-5 py-4 flex items-center justify-between"
             style={{
-              ...slide(180),
-              background: "linear-gradient(115deg, #FF3355 0%, #C8002B 100%)",
+              ...slide(80),
+              background: "linear-gradient(115deg, #FF5570 0%, #E11D48 100%)",
             }}
           >
             <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-20 pointer-events-none"
@@ -266,15 +203,16 @@ export function Profile() {
 
           {/* 설정 */}
           <div style={slide(240)}>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 ml-1 mb-2 mt-3">설정</p>
             <div
               className="rounded-2xl overflow-hidden bg-white border border-black/[0.04]"
               style={{ boxShadow: CARD_SHADOW }}
             >
               {[
-                { icon: Bell,     bg: "bg-[#FFE8EC]", color: "text-[#FF3355]", label: "알림 설정", desc: "인증 · 채팅 · 이벤트 알림을 조정해보세요", onClick: () => guardAction(() => navigate("/settings/notifications")) },
-                { icon: Award,    bg: "bg-amber-50",  color: "text-amber-500", label: "등급",     desc: `현재 ${grade.name} · Lv.${grade.level}`,                       onClick: () => guardAction(() => navigate("/rewards")) },
-                { icon: UserPlus, bg: "bg-sky-50",    color: "text-sky-500",   label: "친구 초대", desc: "함께 챌린지하면 더 즐거워요",                                  onClick: () => guardAction(() => navigate("/friends/invite")) },
+                { icon: Trophy,    bg: "bg-slate-100", color: "text-[#FF5C7A]", label: "나의 챌린지",   desc: totalParticipated > 0 ? `총 ${totalParticipated}개 참여 · 이전 기록 보기` : "아직 참여한 챌린지가 없어요", onClick: () => navigate("/stats/challenge-history") },
+                { icon: ImageIcon, bg: "bg-slate-100", color: "text-[#FF5C7A]", label: "인증 히스토리", desc: photoCount > 0 ? `총 ${photoCount}장 · 갤러리에서 확인` : "아직 저장된 인증 사진이 없어요", onClick: () => navigate("/gallery") },
+                { icon: Bell,     bg: "bg-slate-100", color: "text-[#FF5C7A]", label: "알림 설정", desc: "인증 · 채팅 · 이벤트 알림을 조정해보세요", onClick: () => guardAction(() => navigate("/settings/notifications")) },
+                { icon: Award,    bg: "bg-slate-100", color: "text-[#FF5C7A]", label: "등급",     desc: `현재 ${grade.name} · Lv.${grade.level}`,                       onClick: () => guardAction(() => navigate("/rewards")) },
+                { icon: UserPlus, bg: "bg-slate-100", color: "text-[#FF5C7A]", label: "친구 초대", desc: "함께 챌린지하면 더 즐거워요",                                  onClick: () => guardAction(() => navigate("/friends/invite")) },
               ].map(({ icon: Icon, bg, color, label, desc, onClick }, i) => (
                 <div key={label}>
                   {i > 0 && <div className="h-px bg-slate-100 mx-5" />}
@@ -299,9 +237,9 @@ export function Profile() {
               <div className="px-5 py-4">
                 <div className="flex items-center gap-3.5 mb-3.5">
                   <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-slate-100">
-                    {theme === "dark" ? <Moon className="w-5 h-5 text-slate-500" strokeWidth={2.2} />
-                      : theme === "system" ? <Smartphone className="w-5 h-5 text-slate-500" strokeWidth={2.2} />
-                      : <Sun className="w-5 h-5 text-slate-500" strokeWidth={2.2} />}
+                    {theme === "dark" ? <Moon className="w-5 h-5 text-[#FF5C7A]" strokeWidth={2.2} />
+                      : theme === "system" ? <Smartphone className="w-5 h-5 text-[#FF5C7A]" strokeWidth={2.2} />
+                      : <Sun className="w-5 h-5 text-[#FF5C7A]" strokeWidth={2.2} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-bold text-slate-800 leading-tight">화면 모드</p>
@@ -358,7 +296,7 @@ export function Profile() {
                 className="w-full flex items-center gap-3.5 px-5 py-4 active:bg-slate-50 transition-colors"
               >
                 <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-slate-100">
-                  <LogOut className="w-5 h-5 text-slate-400" strokeWidth={2.2} />
+                  <LogOut className="w-5 h-5 text-[#FF5C7A]" strokeWidth={2.2} />
                 </div>
                 <div className="flex-1 text-left min-w-0">
                   <p className="text-[14px] font-bold text-slate-500 leading-tight">로그아웃</p>
@@ -370,8 +308,8 @@ export function Profile() {
                 onClick={() => guardAction(() => setShowDeleteConfirm(true))}
                 className="w-full flex items-center gap-3.5 px-5 py-4 active:bg-rose-50 transition-colors"
               >
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-rose-50">
-                  <Trash2 className="w-5 h-5 text-rose-500" strokeWidth={2.2} />
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-slate-100">
+                  <Trash2 className="w-5 h-5 text-[#FF5C7A]" strokeWidth={2.2} />
                 </div>
                 <div className="flex-1 text-left min-w-0">
                   <p className="text-[14px] font-bold text-rose-500 leading-tight">계정 삭제</p>

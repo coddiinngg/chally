@@ -227,10 +227,10 @@ export function Success() {
         <X className="w-5 h-5" />
       </button>
 
-      <div className="flex-1 overflow-y-auto pt-14 pb-4 px-6 relative z-10 flex flex-col items-center">
+      <div className="flex-1 min-h-0 overflow-hidden pt-14 pb-3 px-6 relative z-10 flex flex-col items-center">
 
         {/* ── 체크 아이콘 ── */}
-        <div className="mb-5" style={pop(80)}>
+        <div className="mb-3" style={pop(80)}>
           <div className="relative">
             <div
               className="absolute inset-0 rounded-full"
@@ -278,7 +278,7 @@ export function Success() {
         )}
 
         {/* ── 헤드라인 ── */}
-        <div className="text-center mb-5" style={slide(220)}>
+        <div className="text-center mb-3" style={slide(220)}>
           <h1 className="suc-headline-grad text-[34px] font-black leading-tight mb-1.5 tracking-tight inline-flex items-center justify-center gap-2">
             인증 완료!
             <Flame className="w-7 h-7 text-[#FF3355]" fill="#FF3355" strokeWidth={2} />
@@ -291,9 +291,9 @@ export function Success() {
 
         {/* ── 인증 사진 (있을 때만) — 탭하면 공유 카드 열림. 잘리지 않도록 원본 비율 유지 ── */}
         {capturedImageUrl && (
-          <div className="w-full max-w-sm mb-4" style={slide(300)}>
+          <div className="flex-1 min-h-0 w-full flex justify-center items-center mb-1" style={slide(300)}>
             <button
-              className="relative rounded-2xl overflow-hidden w-full active:scale-[0.98] transition-transform block"
+              className="relative rounded-2xl overflow-hidden h-full w-fit max-w-full active:scale-[0.98] transition-transform block"
               style={{
                 border: "1px solid rgba(255,51,85,0.12)",
               }}
@@ -302,7 +302,7 @@ export function Success() {
               <img
                 src={capturedImageUrl}
                 alt="인증 사진"
-                className="w-full h-auto block bg-slate-100"
+                className="h-full w-auto max-w-full object-contain block bg-slate-100"
               />
               {/* 오버레이 배지 */}
               <div

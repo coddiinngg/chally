@@ -63,6 +63,13 @@ export function VerifyGuide() {
         {/* ① 히어로 카드 */}
         <div className="rounded-3xl overflow-hidden relative"
           style={{ ...fade(40), background: cardBg, boxShadow: shadow }}>
+          {/* 배경 사진 */}
+          <img src={vt.exampleImg} alt="" aria-hidden
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            style={{ opacity: d ? 0.45 : 0.55 }} />
+          {/* 가독성 오버레이: 사진 위에 카드 배경색으로 페이드 */}
+          <div className="absolute inset-0 pointer-events-none"
+            style={{ background: `linear-gradient(180deg, ${d ? "rgba(19,22,30,0.35)" : "rgba(255,255,255,0.35)"} 0%, ${cardBg} 92%)` }} />
           {/* 장식 원들 */}
           <div className="absolute -top-10 -right-10 w-36 h-36 rounded-full pointer-events-none"
             style={{ background: `radial-gradient(circle, rgba(255,51,85,${d ? 0.12 : 0.08}) 0%, transparent 70%)` }} />
