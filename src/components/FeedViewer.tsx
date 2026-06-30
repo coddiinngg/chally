@@ -206,6 +206,8 @@ export function FeedViewerOverlay({
                 </div>
               </div>
 
+              {/* 카드 구분 간격 */}
+              <div className="h-2.5 bg-slate-100 dark:bg-white/[0.06]" />
             </div>
           );
         })}

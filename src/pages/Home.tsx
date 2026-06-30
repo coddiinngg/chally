@@ -61,6 +61,7 @@ interface FeedItem {
   time: string;
   caption: string;
   groupTitle: string;
+  verifyEmoji: string;
   verifyIcon: LucideIcon;
   img: string;
   aspect: "tall" | "square";
@@ -400,6 +401,7 @@ export function Home() {
       time: formatActivityTime(post.created_at),
       caption: post.message,
       groupTitle: vt.label,
+      verifyEmoji: vt.emoji,
       verifyIcon: vt.Icon,
       img: post.photo_url ?? "",
       aspect: index % 3 === 0 ? "tall" : "square",
@@ -1583,29 +1585,7 @@ function FeedViewer({
               ref={el => { itemRefs.current[idx] = el; }}
               className="w-full flex flex-col"
             >
-              {/* ── 상단: 유저 정보 (고정 높이) ── */}
-              <div
-                className="shrink-0 flex items-center gap-3 px-5 bg-white dark:bg-[#0d0d0d] border-b border-black/[0.06] dark:border-white/[0.06]"
-                style={{ height: 64 }}
-              >
-                <button
-                  className="flex items-center gap-3 active:opacity-70 transition-opacity"
-                  onClick={() => navigate(`/user/${item.seed}`)}
-                >
-                  <img
-                    src={item.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`}
-                    alt={item.user}
-                    className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-white/10 object-cover shrink-0 border border-black/10 dark:border-white/15"
-                    draggable={false}
-                  />
-                  <div className="text-left">
-                    <p className="text-slate-900 dark:text-white font-black text-[14px] leading-tight">{item.user}</p>
-                    <p className="text-slate-400 dark:text-white/40 text-[11px] leading-none mt-0.5">{item.time}</p>
-                  </div>
-                </button>
-              </div>
-
-              {/* ── 중앙: 사진 — 원본 비율, 최대 화면폭 × 최대 높이 제한 ── */}
+              {/* ── 사진 — 원본 비율, 최대 화면폭 × 최대 높이 제한 ── */}
               <div className="w-full flex items-center justify-center bg-slate-100 dark:bg-black">
                 {item.img ? (
                   <img
@@ -1626,36 +1606,69 @@ function FeedViewer({
                 )}
               </div>
 
-              {/* ── 하단: 이모지 반응 (고정 높이) ── */}
-              <div
-                className="shrink-0 flex items-center justify-center relative bg-white dark:bg-[#0d0d0d] border-t border-black/[0.06] dark:border-white/[0.06]"
-                style={{ height: 64 }}
-                onClick={e => e.stopPropagation()}
-              >
-                {isPickerOpen && (
-                  <div
-                    className="absolute bottom-full mb-1 flex gap-1 rounded-2xl px-2 py-1.5 bg-slate-100 dark:bg-[#1e1e1e] border border-black/10 dark:border-white/10"
-                    style={{ animation: "fv-picker 0.15s ease both" }}
+              {/* ── 유저 정보 + 태그 (사진 바로 아래) ── */}
+              <div className="px-4 py-2.5 bg-white dark:bg-[#0d0d0d]">
+                <div className="flex items-center gap-2.5">
+                  <button
+                    className="shrink-0 active:opacity-70 transition-opacity"
+                    onClick={() => navigate(`/user/${item.seed}`)}
                   >
-                    {FEED_REACTIONS.map(emoji => (
-                      <button
-                        key={emoji}
-                        onClick={() => void handleReact(postId, emoji)}
-                        className={`w-10 h-10 flex items-center justify-center text-[22px] rounded-xl active:scale-90 transition-transform ${rxState.emoji === emoji ? "bg-black/[0.08] dark:bg-white/[0.12]" : ""}`}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
+                    <img
+                      src={item.avatarUrl ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seed}`}
+                      alt={item.user}
+                      className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-white/10 object-cover border border-black/10 dark:border-white/15"
+                      draggable={false}
+                    />
+                  </button>
+
+                  <div className="flex-1 min-w-0">
+                    {/* 이름 + 시간 */}
+                    <button
+                      className="flex items-baseline gap-1.5 min-w-0 active:opacity-70 transition-opacity"
+                      onClick={() => navigate(`/user/${item.seed}`)}
+                    >
+                      <span className="text-slate-900 dark:text-white font-black text-[14px] leading-tight truncate">{item.user}</span>
+                      <span className="text-slate-400 dark:text-white/40 text-[11px] shrink-0">{item.time}</span>
+                    </button>
+
+                    {/* 태그 (이름 바로 아래) */}
+                    <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-white/70 text-[11px] font-bold max-w-full">
+                      <span className="text-[12px] leading-none">{item.verifyEmoji}</span>
+                      <span className="truncate">{item.groupTitle}</span>
+                    </span>
                   </div>
-                )}
-                <button
-                  onClick={() => setPickerFor(isPickerOpen ? null : postId)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full active:scale-95 transition-all border ${rxState.emoji ? "border-[#FF3355]/40 bg-[#FF3355]/[0.15]" : "border-black/10 dark:border-white/12 bg-black/[0.06] dark:bg-white/[0.07]"}`}
-                >
-                  <span className="text-[20px] leading-none">{rxState.emoji ?? "👍"}</span>
-                  <span className="text-slate-800 dark:text-white font-black text-[14px] tabular-nums">{rxState.count}</span>
-                </button>
+
+                  {/* 반응 (사용자 사진 줄 기준 세로 중앙) */}
+                  <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
+                    {isPickerOpen && (
+                      <div
+                        className="absolute bottom-full right-0 mb-1 flex gap-1 rounded-2xl px-2 py-1.5 bg-slate-100 dark:bg-[#1e1e1e] border border-black/10 dark:border-white/10"
+                        style={{ animation: "fv-picker 0.15s ease both" }}
+                      >
+                        {FEED_REACTIONS.map(emoji => (
+                          <button
+                            key={emoji}
+                            onClick={() => void handleReact(postId, emoji)}
+                            className={`w-10 h-10 flex items-center justify-center text-[22px] rounded-xl active:scale-90 transition-transform ${rxState.emoji === emoji ? "bg-black/[0.08] dark:bg-white/[0.12]" : ""}`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setPickerFor(isPickerOpen ? null : postId)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full active:scale-95 transition-all border ${rxState.emoji ? "border-[#FF3355]/40 bg-[#FF3355]/[0.15]" : "border-black/10 dark:border-white/[0.12] bg-black/[0.06] dark:bg-white/[0.07]"}`}
+                    >
+                      <span className="text-[17px] leading-none">{rxState.emoji ?? "👍"}</span>
+                      <span className="text-slate-800 dark:text-white font-black text-[14px] tabular-nums">{rxState.count}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
+
+              {/* 카드 구분 간격 */}
+              <div className="h-2.5 bg-slate-100 dark:bg-white/[0.06]" />
             </div>
           );
         })}
