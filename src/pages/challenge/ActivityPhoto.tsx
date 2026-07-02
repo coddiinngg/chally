@@ -91,7 +91,7 @@ export function ActivityPhoto() {
 
   return (
     <div
-      className="flex flex-col h-full bg-black overflow-hidden relative"
+      className="flex flex-col h-full bg-white overflow-hidden relative"
       onClick={() => showPicker && setShowPicker(false)}
     >
       {/* 배경 이미지 또는 그라데이션 — 오버레이 없음 */}

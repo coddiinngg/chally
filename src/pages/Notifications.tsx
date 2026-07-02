@@ -1,58 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ChevronLeft, CheckCircle2, Trophy, Users, Star, Flame, Bell, BellRing, Check, X, AlertTriangle, LogOut, Zap, Flag, Timer } from "lucide-react";
+import { ChevronLeft, Bell, Check, X, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
-import { useApp, type NotifType, type AppNotification } from "../contexts/AppContext";
+import { useApp, type AppNotification } from "../contexts/AppContext";
 import { useScrollRestoration, isReturningVisit } from "../lib/useScrollRestoration";
-
-const TYPE_ICON: Record<NotifType, React.ElementType> = {
-  goal:               CheckCircle2,
-  badge:              Star,
-  group:              Users,
-  rank:               Trophy,
-  streak:             Flame,
-  member_warning:     AlertTriangle,
-  member_removed:     LogOut,
-  challenge_start:    Zap,
-  challenge_end:      Flag,
-  challenge_dday:     Timer,
-  daily_reminder:     Bell,
-  challenge_reopened: BellRing,
-};
-
-const TYPE_COLOR: Record<NotifType, string> = {
-  goal:               "#10B981",
-  badge:              "#F59E0B",
-  group:              "#6366F1",
-  rank:               "#F97316",
-  streak:             "#FB923C",
-  member_warning:     "#D97706",
-  member_removed:     "#FF3355",
-  challenge_start:    "#FF3355",
-  challenge_end:      "#6366F1",
-  challenge_dday:     "#F97316",
-  daily_reminder:     "#0EA5E9",
-  challenge_reopened: "#FF3355",
-};
-
-const TYPE_BG: Record<NotifType, string> = {
-  goal:               "#ECFDF5",
-  badge:              "#FFFBEB",
-  group:              "#EEF2FF",
-  rank:               "#FFF7ED",
-  streak:             "#FFF7ED",
-  member_warning:     "#FFFBEB",
-  member_removed:     "#FFF1F2",
-  challenge_start:    "#FFF0F3",
-  challenge_end:      "#EEF2FF",
-  challenge_dday:     "#FFF7ED",
-  daily_reminder:     "#F0F9FF",
-  challenge_reopened: "#FFF0F3",
-};
+import { NOTIF_ICON as TYPE_ICON, NOTIF_COLOR as TYPE_COLOR, NOTIF_BG as TYPE_BG } from "../lib/notifMeta";
 
 export function Notifications() {
   const navigate = useNavigate();
-  const { notifications, notificationsLoading, markNotifRead, markAllNotifsRead, handleNotifAction } = useApp();
+  const { notifications, notificationsLoading, groups, markNotifRead, markAllNotifsRead, deleteNotif, clearReadNotifs, handleNotifAction } = useApp();
   const [mounted, setMounted] = useState(() => isReturningVisit("nt-scroll"));
   const scrollRef = useRef<HTMLDivElement>(null);
   useScrollRestoration("nt-scroll", scrollRef, !notificationsLoading);
@@ -66,6 +22,22 @@ export function Notifications() {
   const unreadCount = notifications.filter(n => !n.read).length;
   const unread = notifications.filter(n => !n.read);
   const read   = notifications.filter(n => n.read);
+
+  // 알림 → 이동 대상 경로. relatedId(그룹 uuid)를 앱 그룹 id로 매핑한다.
+  function openNotif(n: AppNotification) {
+    if (!n.read) void markNotifRead(n.id);
+    // 그룹 초대 등 액션 대기 알림은 이동시키지 않고 카드 내 버튼으로 처리
+    if (n.actionable && !n.actionDone) return;
+    if (!n.relatedId) return;
+    const g = groups.find(x => x.dbId === n.relatedId);
+    if (!g) return;
+    // "인증을 완료했어요" 알림 → 그룹 활동(사진) 탭으로 이동
+    if (n.type === "group") {
+      navigate(`/challenge/group/${g.id}`, { state: { tab: "activity" } });
+      return;
+    }
+    navigate(`/challenge/group/${g.id}`);
+  }
 
   return (
     <div className="flex flex-col h-full bg-[#F8F8FA] overflow-hidden">
@@ -113,7 +85,8 @@ export function Notifications() {
                   index={i}
                   mounted={mounted}
                   isUnread
-                  onRead={() => void markNotifRead(n.id)}
+                  onOpen={() => openNotif(n)}
+                  onDelete={() => void deleteNotif(n.id)}
                   onAccept={() => void handleNotifAction(n.id, true)}
                   onReject={() => void handleNotifAction(n.id, false)}
                 />
@@ -125,7 +98,16 @@ export function Notifications() {
         {/* 읽은 알림 */}
         {read.length > 0 && (
           <div className="px-4 pt-4 pb-6">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 ml-1 mb-2">이전 알림</p>
+            <div className="flex items-center justify-between ml-1 mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">이전 알림</p>
+              <button
+                onClick={() => void clearReadNotifs()}
+                className="flex items-center gap-1 text-[11px] font-bold text-slate-400 active:text-slate-600 transition-colors pr-1"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                모두 지우기
+              </button>
+            </div>
             <div className="space-y-1.5">
               {read.map((n, i) => (
                 <NotifCard
@@ -134,7 +116,8 @@ export function Notifications() {
                   index={i + unread.length}
                   mounted={mounted}
                   isUnread={false}
-                  onRead={() => void markNotifRead(n.id)}
+                  onOpen={() => openNotif(n)}
+                  onDelete={() => void deleteNotif(n.id)}
                   onAccept={() => void handleNotifAction(n.id, true)}
                   onReject={() => void handleNotifAction(n.id, false)}
                 />
@@ -165,13 +148,14 @@ export function Notifications() {
 }
 
 function NotifCard({
-  n, index, mounted, isUnread, onRead, onAccept, onReject, key: _key,
+  n, index, mounted, isUnread, onOpen, onDelete, onAccept, onReject, key: _key,
 }: {
   n: AppNotification;
   index: number;
   mounted: boolean;
   isUnread: boolean;
-  onRead: () => void;
+  onOpen: () => void;
+  onDelete: () => void;
   onAccept: () => void;
   onReject: () => void;
   key?: React.Key;
@@ -189,17 +173,13 @@ function NotifCard({
       >
         <button
           className="w-full flex items-start gap-3 active:opacity-70 transition-opacity"
-          onClick={onRead}
+          onClick={onOpen}
         >
           <div
             className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-0.5"
             style={{ background: TYPE_BG[n.type] }}
           >
-            {n.emoji ? (
-              <span className="text-lg">{n.emoji}</span>
-            ) : (
-              <Icon style={{ color: TYPE_COLOR[n.type], width: 18, height: 18 }} />
-            )}
+            <Icon style={{ color: TYPE_COLOR[n.type], width: 18, height: 18 }} />
           </div>
           <div className="flex-1 min-w-0 text-left">
             <div className="flex items-center gap-2 mb-0.5">
@@ -247,21 +227,26 @@ function NotifCard({
         transition: `opacity 0.4s ease ${index * 40 + 100}ms, transform 0.4s ease ${index * 40 + 100}ms`,
       }}
     >
-      <div
-        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 opacity-60"
-        style={{ background: TYPE_BG[n.type] }}
-      >
-        {n.emoji ? (
-          <span className="text-base">{n.emoji}</span>
-        ) : (
+      <button className="flex-1 flex items-start gap-3 min-w-0 text-left active:opacity-70 transition-opacity" onClick={onOpen}>
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 opacity-60"
+          style={{ background: TYPE_BG[n.type] }}
+        >
           <Icon style={{ color: TYPE_COLOR[n.type], width: 16, height: 16 }} />
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[12px] font-bold text-slate-500">{n.title}</p>
-        <p className="text-[12px] text-slate-400 leading-snug mt-0.5">{n.body}</p>
-        <p className="text-[10px] text-slate-300 mt-0.5 font-semibold">{n.time}</p>
-      </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[12px] font-bold text-slate-500">{n.title}</p>
+          <p className="text-[12px] text-slate-400 leading-snug mt-0.5">{n.body}</p>
+          <p className="text-[10px] text-slate-300 mt-0.5 font-semibold">{n.time}</p>
+        </div>
+      </button>
+      <button
+        onClick={onDelete}
+        aria-label="알림 삭제"
+        className="w-7 h-7 -mr-1 flex items-center justify-center rounded-lg text-slate-300 active:bg-slate-100 active:text-slate-500 transition-colors shrink-0"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
     </div>
   );
 }

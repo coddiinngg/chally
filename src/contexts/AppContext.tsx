@@ -228,6 +228,8 @@ interface AppContextType {
   latestNotification: AppNotification | null;
   markNotifRead: (id: string) => Promise<void>;
   markAllNotifsRead: () => Promise<void>;
+  deleteNotif: (id: string) => Promise<void>;
+  clearReadNotifs: () => Promise<void>;
   handleNotifAction: (id: string, accepted?: boolean) => Promise<void>;
   reloadNotifications: () => Promise<void>;
   // 강퇴 배너 (앱 진입 시 1회 노출)
@@ -471,6 +473,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .in("id", unreadIds);
     if (error) {
       console.error("Failed to mark all notifications as read", error);
+      setNotifications(snapshot);
+    }
+  }
+
+  async function deleteNotif(id: string) {
+    const snapshot = notifications;
+    setNotifications(p => p.filter(n => n.id !== id));
+    const { error } = await supabase.from("notifications").delete().eq("id", id);
+    if (error) {
+      console.error("Failed to delete notification", error);
+      setNotifications(snapshot);
+    }
+  }
+
+  async function clearReadNotifs() {
+    const readIds = notifications.filter(n => n.read).map(n => n.id);
+    if (!readIds.length) return;
+    const snapshot = notifications;
+    setNotifications(p => p.filter(n => !n.read));
+    const { error } = await supabase.from("notifications").delete().in("id", readIds);
+    if (error) {
+      console.error("Failed to clear read notifications", error);
       setNotifications(snapshot);
     }
   }
@@ -752,7 +776,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       confirmedEndedIds, confirmEndedGroup,
       reopenNotifyIds, toggleReopenNotify,
       notifications, notificationsLoading, latestNotification,
-      markNotifRead, markAllNotifsRead, handleNotifAction, reloadNotifications,
+      markNotifRead, markAllNotifsRead, deleteNotif, clearReadNotifs, handleNotifAction, reloadNotifications,
       recentRemovals, dismissRemoval,
     }}>
       {children}

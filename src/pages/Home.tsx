@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from
 import type { LucideIcon } from "lucide-react";
 import { Bell, BellRing, Camera, Flame, Send, Crown, ChevronRight, Zap, Lightbulb, SmilePlus, Trophy, ArrowRight, ChevronLeft, Dumbbell, Satellite, Activity, MessageCircle, Hourglass, Flag, PartyPopper } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useApp } from "../contexts/AppContext";
+import { useApp, type AppNotification } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../lib/verifyTypes";
 import { useGuestGuard } from "../contexts/GuestGuardContext";
@@ -12,6 +12,7 @@ import { formatChatTime, loadGroupMessages, type GroupChatMessage, type MessageE
 import { supabase } from "../lib/supabase";
 import type { GroupMessageRecord } from "../types/database";
 import { getBenefitGrade } from "../lib/challengeUtils";
+import { NOTIF_ICON, NOTIF_COLOR } from "../lib/notifMeta";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 const rateColor = (r: number) => r >= 80 ? "#10B981" : r >= 50 ? "#F59E0B" : "#FF3355";
@@ -76,7 +77,7 @@ export function Home() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { nickname, beginVerification, groups, groupsLoading, groupsLoadError, selectedGroupId, setSelectedGroupId, notifications, latestNotification, confirmedEndedIds, confirmEndedGroup } = useApp();
+  const { nickname, beginVerification, groups, groupsLoading, groupsLoadError, selectedGroupId, setSelectedGroupId, notifications, latestNotification, markNotifRead, confirmedEndedIds, confirmEndedGroup } = useApp();
   const { user, profile } = useAuth();
   const avatarUrl = profile?.avatar_url ?? null;
   const myGroups = groups.filter(g => g.joined && !confirmedEndedIds.has(g.id));
@@ -494,6 +495,27 @@ export function Home() {
     btnFlashTimer.current = setTimeout(() => setBtnFlash(false), 600);
   }
 
+  // 알림 피크 닫기 (달성률 카운트 애니메이션 정리 후 원래 숫자 복구)
+  function closeNotifMode() {
+    if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null; }
+    if (rateDisplayRef.current) rateDisplayRef.current.textContent = String(groupRate);
+    ignoreTapRef.current = false;
+    setNotifMode(false);
+  }
+
+  // 알림 탭 → 읽음 처리 + 관련 그룹으로 이동 (알림 페이지와 동일한 규칙)
+  function openNotif(n: AppNotification) {
+    void markNotifRead(n.id);
+    const g = n.relatedId ? groups.find(x => x.dbId === n.relatedId) : null;
+    if (g) {
+      setNotifMode(false);
+      // "인증을 완료했어요" 알림 → 그룹 활동(사진) 탭으로
+      navigate(`/challenge/group/${g.id}`, n.type === "group" ? { state: { tab: "activity" } } : undefined);
+      return;
+    }
+    closeNotifMode();
+  }
+
   async function sendChat() {
     const text = chatInput.trim();
     if (!text) return;
@@ -759,8 +781,7 @@ export function Home() {
                   <p className="text-slate-700 font-black text-[16px]">참여 중인 그룹이 없어요</p>
                   <p className="text-slate-400 text-[13px]">챌린지 탭에서 그룹에 참여해보세요</p>
                   <button onClick={() => navigate("/challenge")}
-                    className="mt-1 px-5 py-2.5 rounded-2xl text-white font-bold text-[14px] active:scale-95 transition-transform"
-                    style={{ background: "linear-gradient(135deg,#FF3355,#C8002B)" }}>
+                    className="mt-1 px-5 py-2.5 rounded-2xl text-slate-700 font-bold text-[14px] active:scale-95 transition-transform border border-slate-500 bg-white">
                     그룹 둘러보기
                   </button>
                 </div>
@@ -929,24 +950,37 @@ export function Home() {
                     <div className="flex justify-center">
                       <span className="text-white/50 text-[13px] font-semibold">최근 알림이 없어요</span>
                     </div>
-                  ) : recentNotifs.map((n, i) => (
-                    <div
+                  ) : recentNotifs.map((n, i) => {
+                    const Icon = NOTIF_ICON[n.type];
+                    return (
+                    <button
                       key={n.id}
-                      className="flex items-center gap-2 px-3 py-2 rounded-2xl"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-2xl text-left active:scale-[0.98] transition-transform"
                       style={{
                         background: "rgba(0,0,0,0.42)",
                         backdropFilter: "blur(8px)",
-                        border: "1px solid rgba(255,255,255,0.10)",
+                        border: `1px solid ${n.read ? "rgba(255,255,255,0.10)" : "rgba(255,51,85,0.45)"}`,
                         animation: "notif-drop 0.2s ease-out forwards",
                         animationDelay: `${i * 0.04}s`,
                         opacity: 0,
+                        pointerEvents: "auto",
                       }}
+                      onTouchStart={e => { e.stopPropagation(); ignoreTapRef.current = true; }}
+                      onTouchEnd={e => e.stopPropagation()}
+                      onMouseDown={e => { e.stopPropagation(); ignoreTapRef.current = true; }}
+                      onMouseUp={e => e.stopPropagation()}
+                      onClick={() => openNotif(n)}
                     >
-                      <span className="text-[15px] leading-none shrink-0">{n.emoji ?? "🔔"}</span>
-                      <span className="text-white text-[12px] font-semibold leading-none flex-1">{n.body}</span>
+                      <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background: "rgba(255,255,255,0.14)" }}>
+                        <Icon style={{ color: NOTIF_COLOR[n.type], width: 15, height: 15 }} />
+                      </div>
+                      <span className="text-white text-[12px] font-semibold leading-snug flex-1 line-clamp-1">{n.body}</span>
+                      {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-[#FF3355] shrink-0" />}
                       <span className="text-white/40 text-[10px] font-medium shrink-0">{n.time}</span>
-                    </div>
-                  ))}
+                    </button>
+                    );
+                  })}
                 </div>
               )}
 

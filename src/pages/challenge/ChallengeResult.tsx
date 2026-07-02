@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { Trophy, Zap, Flame, Users, ArrowRight, ChevronLeft, Crown, CheckCircle2, Calendar, ImageIcon, PartyPopper, Dumbbell, DoorOpen, Hand, Camera } from "lucide-react";
+import { Trophy, Zap, Flame, Users, ArrowRight, ChevronLeft, Crown, CheckCircle2, XCircle, Calendar, ImageIcon, PartyPopper, Dumbbell, DoorOpen, Hand, Camera } from "lucide-react";
 import { useApp, type Group } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
@@ -9,6 +9,7 @@ import { loadGroupLeaderboard, type LeaderboardItem } from "../../lib/leaderboar
 import { loadActivityFeed, formatActivityTime, type ActivityFeedItem } from "../../lib/activity";
 import { VERIFY_TYPES, type VerifyTypeKey } from "../../lib/verifyTypes";
 import { cn } from "../../lib/utils";
+import { usePersistedNumber, useScrollRestoration, isReturningVisit } from "../../lib/useScrollRestoration";
 
 // ── Demo 모드용 더미 데이터 (?demo=1) ──
 const DEMO_NAMES = ["민지", "지훈", "수아", "현우", "예린", "도윤", "하린", "재현", "유나", "성민"];
@@ -97,20 +98,39 @@ export function ChallengeResult() {
   const group = demoMode ? (realGroup ?? DEMO_GROUP) : realGroup;
   const vt    = group ? VERIFY_TYPES[(group.verifyType as VerifyTypeKey) ?? "step_walk"] : null;
 
+  // 사진 상세 등에서 뒤로 돌아왔을 때 보던 슬라이드/스크롤 위치를 복원한다.
+  const rkBase = `cr-${groupId ?? "x"}`;
   const [stats, setStats]                 = useState<Stats | null>(null);
   const [leaderboard, setLeaderboard]     = useState<LeaderboardItem[]>([]);
   const [activityPosts, setActivityPosts] = useState<ActivityFeedItem[]>([]);
-  const [mounted, setMounted]             = useState(false);
-  const [currentSlide, setCurrentSlide]   = useState(0);
+  const [mounted, setMounted]             = useState(() => isReturningVisit(`${rkBase}-slide`));
+  const [currentSlide, setCurrentSlide]   = usePersistedNumber(`${rkBase}-slide`, 0);
   const slideContainerRef                 = useRef<HTMLDivElement>(null);
+  const resultSlideRef                    = useRef<HTMLDivElement>(null);
+  const feedSlideRef                      = useRef<HTMLDivElement>(null);
+  const slideRestoredRef                  = useRef(false);
+  useScrollRestoration(`${rkBase}-v0`, resultSlideRef, !!stats);
+  useScrollRestoration(`${rkBase}-v1`, feedSlideRef, !!stats);
+
+  // 저장된 슬라이드로 가로 스크롤 복원 (마운트 1회, 페인트 전)
+  useLayoutEffect(() => {
+    if (slideRestoredRef.current) return;
+    const el = slideContainerRef.current;
+    if (!el || el.clientWidth === 0) return;
+    if (currentSlide > 0) el.scrollLeft = el.clientWidth * currentSlide;
+    slideRestoredRef.current = true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [memberRowId, setMemberRowId]     = useState<string | null>(null);
   const [joinedAt, setJoinedAt]           = useState<string | null>(null);
   const [claimedAt, setClaimedAt]         = useState<string | null>(null);
   const [claiming, setClaiming]           = useState(false);
 
   useEffect(() => {
+    if (mounted) return;
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 리더보드 + 활동 피드 + 내 통계 로드
@@ -394,7 +414,7 @@ export function ChallengeResult() {
         style={{ scrollBehavior: "smooth" }}
       >
         {/* ════════ 슬라이드 2: 활동 기록 (시각상 우측) ════════ */}
-        <div className="w-full shrink-0 snap-start overflow-y-auto no-scrollbar pb-32" style={{ order: 2 }}>
+        <div ref={feedSlideRef} className="w-full shrink-0 snap-start overflow-y-auto no-scrollbar pb-48" style={{ order: 2 }}>
           <div className="px-5 pt-4 flex flex-col gap-3">
 
             {/* 그룹 헤더 */}
@@ -464,7 +484,7 @@ export function ChallengeResult() {
               <div className="rounded-2xl py-3 flex flex-col items-center"
                 style={{ background: "rgba(0,0,0,0.03)", border: "1px solid rgba(0,0,0,0.06)" }}>
                 <Trophy className="w-4 h-4 mb-1" style={{ color: achieved ? "#FF3355" : "#94A3B8" }} />
-                <p className="font-black text-[16px] tabular-nums" style={{ color: achieved ? "#FF3355" : "#FFFFFF" }}>
+                <p className="font-black text-[16px] tabular-nums" style={{ color: achieved ? "#FF3355" : "#0F172A" }}>
                   {stats?.crewRate ?? group.crewRate}%
                 </p>
                 <p className="text-slate-400 text-[10px] mt-0.5">크루 달성</p>
@@ -502,16 +522,24 @@ export function ChallengeResult() {
                             transform: podiumIdx === 0 ? "translateY(-6px)" : "none",
                           }}>
                           <Crown className="w-4 h-4 mb-1" style={{ color }} />
-                          <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-200 mb-1">
+                          <button
+                            type="button"
+                            onClick={() => !p.isMe && navigate(`/user/${p.seed}`)}
+                            className={cn(
+                              "w-9 h-9 rounded-xl overflow-hidden bg-slate-200 mb-1",
+                              !p.isMe && "active:scale-90 transition-transform",
+                            )}
+                            style={{ boxShadow: `0 0 0 2px ${color}55` }}
+                          >
                             {p.avatarUrl
                               ? <img src={p.avatarUrl} alt="" className="w-full h-full object-cover" />
                               : <div className="w-full h-full flex items-center justify-center text-slate-600 text-[13px] font-bold">{p.name.charAt(0)}</div>
                             }
-                          </div>
+                          </button>
                           <p className="text-slate-900 font-bold text-[11px] truncate w-full text-center px-1">
                             {p.isMe ? "나" : p.name}
                           </p>
-                          <p className="font-black text-[13px] tabular-nums" style={{ color }}>{p.rate}%</p>
+                          <p className="text-slate-900 font-black text-[13px] tabular-nums">{p.rate}%</p>
                         </div>
                       );
                     })}
@@ -530,13 +558,20 @@ export function ChallengeResult() {
                           background: p.isMe ? "rgba(255,51,85,0.12)" : "transparent",
                         }}>
                         <span className="text-slate-400 text-[12px] font-bold tabular-nums w-6 text-center">{p.rank}</span>
-                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => !p.isMe && navigate(`/user/${p.seed}`)}
+                          className={cn("w-8 h-8 rounded-lg overflow-hidden bg-slate-200 shrink-0", !p.isMe && "active:scale-90 transition-transform")}
+                        >
                           {p.avatarUrl
                             ? <img src={p.avatarUrl} alt="" className="w-full h-full object-cover" />
                             : <div className="w-full h-full flex items-center justify-center text-slate-600 text-[11px] font-bold">{p.name.charAt(0)}</div>
                           }
-                        </div>
-                        <p className="flex-1 text-slate-900 text-[13px] font-bold truncate">{p.isMe ? "나" : p.name}</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => !p.isMe && navigate(`/user/${p.seed}`)}
+                          className="flex-1 min-w-0 text-left text-slate-900 text-[13px] font-bold truncate">{p.isMe ? "나" : p.name}</button>
                         <p className="text-slate-900 font-black text-[13px] tabular-nums">{p.rate}%</p>
                       </div>
                     ))}
@@ -556,7 +591,23 @@ export function ChallengeResult() {
                   {activityPosts.slice(0, 12).map((post) => (
                     <button
                       key={post.id}
-                      onClick={() => navigate(`/challenge/group/${groupId}/activity`)}
+                      onClick={() => navigate(`/challenge/group/${groupId}/activity`, {
+                        state: {
+                          postId: post.id,
+                          userId: post.user_id,
+                          imgSrc: post.photo_url,
+                          grad: ["#FF3355", "#FF6680"] as [string, string],
+                          name: post.author_name ?? "유저",
+                          seed: post.user_id,
+                          time: formatActivityTime(post.created_at),
+                          msg: post.message ?? "",
+                          type: "verify",
+                          reactionCount: post.reactionCount,
+                          myReaction: post.myReaction,
+                          avatarUrl: post.author_avatar_url,
+                          canReact: !isViewerOnly,
+                        },
+                      })}
                       className="aspect-square rounded-xl overflow-hidden relative active:scale-95 transition-transform"
                       style={{ background: "rgba(0,0,0,0.04)" }}
                     >
@@ -594,7 +645,7 @@ export function ChallengeResult() {
         </div>
 
         {/* ════════ 슬라이드 1: 챌린지 결과 정리 (시각상 좌측 — 먼저 보임) ════════ */}
-        <div className="w-full shrink-0 snap-start overflow-y-auto no-scrollbar pb-32" style={{ order: 1 }}>
+        <div ref={resultSlideRef} className="w-full shrink-0 snap-start overflow-y-auto no-scrollbar pb-48" style={{ order: 1 }}>
 
           {/* 대형 이모지 + 상태 */}
           <div className="relative flex flex-col items-center pt-6 pb-4">
@@ -645,10 +696,30 @@ export function ChallengeResult() {
                 : <Dumbbell className="w-14 h-14 text-slate-500" strokeWidth={2} />
               }
             </div>
-            <h1 className="relative text-slate-900 font-black text-[28px] leading-none">
+            <h1
+              className={cn(
+                "relative font-black text-[28px] leading-none",
+                achieved ? "cr-rate-grad" : "text-slate-400",
+              )}
+            >
               챌린지 {achieved ? "달성" : "미달성"}
             </h1>
-            <p className="relative text-slate-500 text-[13px] mt-1.5 font-medium">{group.title}</p>
+            <div
+              className="relative mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full"
+              style={{
+                background: achieved ? "rgba(255,51,85,0.10)" : "rgba(100,116,139,0.12)",
+                border: `1px solid ${achieved ? "rgba(255,51,85,0.28)" : "rgba(100,116,139,0.22)"}`,
+              }}
+            >
+              {achieved
+                ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "#FF3355" }} strokeWidth={2.6} />
+                : <XCircle className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.6} />
+              }
+              <span className="text-[12px] font-black" style={{ color: achieved ? "#FF3355" : "#64748B" }}>
+                {achieved ? "크루 목표 달성" : "크루 목표 미달성"}
+              </span>
+            </div>
+            <p className="relative text-slate-500 text-[13px] mt-2 font-medium">{group.title}</p>
           </div>
 
           {/* 스크롤 영역 */}
